@@ -80,6 +80,7 @@ ignore = [
     "PLW0120",  # `else` clause on loop without a `break` statement (false positives, we use often return statement)
     "PLW1510",  # `subprocess.run` without explicit `check` argument
     "PLW2901",  #  Outer `{outer_kind}` variable `{name}` overwritten by inner `{inner_kind}` target
+    "RUF012",
     "W191",  # Indentation contains tabs
 ]
 
