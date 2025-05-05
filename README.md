@@ -1,5 +1,14 @@
 # Strava HR Zone Calendar Visualization
 
+<div align="center">
+
+[![Python version](https://img.shields.io/badge/python-3.12-blue)](https://img.shields.io/badge/python-3.12-blue)
+[![codecov](https://codecov.io/github/stancld/strava-zones/graph/badge.svg?token=LNOJHFDBUA)](https://codecov.io/github/stancld/strava-zones)
+
+______________________________________________________________________
+
+</div>
+
 ## Overview
 
 This project aims to enhance the Strava web experience by displaying aggregated Heart Rate (HR) zone data directly on the user's Training Calendar page. It consists of a Chrome Extension that communicates with a custom backend server to fetch, process, and store activity data obtained via the Strava API.
