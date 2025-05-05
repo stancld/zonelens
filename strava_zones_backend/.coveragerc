@@ -1,0 +1,7 @@
+[run]
+omit =
+    */tests.py
+    */migrations/*
+    manage.py
+    strava_zones_backend/wsgi.py
+    strava_zones_backend/asgi.py
