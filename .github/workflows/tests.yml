@@ -56,5 +56,5 @@ jobs:
         uses: codecov/codecov-action@v3
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
-          file: ./coverage.xml
+          file: ./strava_zones_backend/coverage.xml
           name: codecov-umbrella
