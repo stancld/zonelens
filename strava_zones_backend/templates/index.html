@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Strava Zones - Test Frontend</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; }
+        #profile, #error { margin-top: 20px; padding: 15px; border: 1px solid #ccc; border-radius: 5px; }
+        #profile { background-color: #e9f5e9; border-color: #a3cfa3; }
+        #error { background-color: #f8d7da; border-color: #f5c6cb; color: #721c24; }
+        button { padding: 10px 15px; font-size: 1em; cursor: pointer; }
+    </style>
+</head>
+<body>
+
+    <h1>Strava Zones - Test Frontend</h1>
+
+    <div id="auth-section">
+        <p>Click the button below to authenticate with Strava.</p>
+        <button onclick="window.location.href='/api/auth/strava'">Login with Strava</button>
+    </div>
+
+    <div id="profile" style="display: none;">
+        <h2>Authenticated Profile</h2>
+        <pre id="profile-data"></pre>
+        <button onclick="logout()">Logout</button>
+    </div>
+
+    <div id="error" style="display: none;">
+        <h2>Error</h2>
+        <p id="error-message"></p>
+    </div>
+
+    <script>
+        const authSection = document.getElementById('auth-section');
+        const profileSection = document.getElementById('profile');
+        const profileData = document.getElementById('profile-data');
+        const errorSection = document.getElementById('error');
+        const errorMessage = document.getElementById('error-message');
+
+        // Function to fetch profile data using the stored token
+        async function fetchProfile(token) {
+            try {
+                const response = await fetch('/api/profile/', {
+                    headers: {
+                        'Authorization': `Token ${token}`,
+                        'Accept': 'application/json'
+                    }
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    profileData.textContent = JSON.stringify(data, null, 2);
+                    authSection.style.display = 'none';
+                    profileSection.style.display = 'block';
+                    errorSection.style.display = 'none';
+                } else {
+                    // Handle non-OK responses (e.g., 401 Unauthorized, 403 Forbidden)
+                    const errorText = await response.text();
+                    console.error('Failed to fetch profile:', response.status, errorText);
+                    showError(`Failed to fetch profile: ${response.status}. Check console for details.`);
+                    logout(); // Clear token if it's invalid
+                }
+            } catch (error) {
+                console.error('Network error fetching profile:', error);
+                showError('Network error fetching profile. Is the backend server running?');
+                logout();
+            }
+        }
+
+        // Function to display errors
+        function showError(message) {
+            errorMessage.textContent = message;
+            errorSection.style.display = 'block';
+            profileSection.style.display = 'none';
+            authSection.style.display = 'block'; // Show login button again
+        }
+
+        // Function to logout (clear token and refresh)
+        function logout() {
+            localStorage.removeItem('authToken');
+            profileSection.style.display = 'none';
+            authSection.style.display = 'block';
+            errorSection.style.display = 'none';
+            // Optionally redirect or just update UI
+            // window.location.reload();
+        }
+
+        // Check for token on page load
+        window.onload = () => {
+            const token = localStorage.getItem('authToken');
+            if (token) {
+                fetchProfile(token);
+            } else {
+                authSection.style.display = 'block';
+                profileSection.style.display = 'none';
+            }
+        };
+    </script>
+
+</body>
+</html>
