@@ -14,17 +14,17 @@ This file outlines the development steps and serves as a checklist to track prog
     - [x] Configure `settings.py` for `api` app, `rest_framework`, and database connection (using `.env`).
     - [x] Create initial database migrations (`makemigrations api`).
     - [x] Apply initial database migrations (`migrate`).
-- [ ] **Strava Authentication**
-    - [ ] Register application on Strava Developers (get Client ID/Secret).
-    *   [ ] Store Client ID/Secret securely (e.g., in `.env`).
-    - [ ] Implement `/api/auth/strava` view (redirects to Strava OAuth URL).
-    - [ ] Implement `/api/auth/strava/callback` view:
-        - [ ] Handle code exchange with Strava.
-        - [ ] Fetch basic user info from Strava.
-        - [ ] Encrypt tokens.
-        - [ ] Create or update `User` record in the database.
-        - [ ] Implement basic session/token management for *our* backend.
-    - [ ] Add URL patterns for auth views.
+- [x] **Strava Authentication**
+    - [x] Register application on Strava Developers (get Client ID/Secret).
+    *   [x] Store Client ID/Secret securely (e.g., in `.env`).
+    - [x] Implement `/api/auth/strava` view (redirects to Strava OAuth URL).
+    - [x] Implement `/api/auth/strava/callback` view:
+        - [x] Handle code exchange with Strava.
+        - [x] Fetch basic user info from Strava.
+        - [x] Encrypt tokens.
+        - [x] Create or update `User` record in the database.
+        - [x] Implement basic session/token management for *our* backend.
+    - [x] Add URL patterns for auth views.
 - [ ] **Custom Zone Settings API**
     - [ ] Implement `GET /api/zones/settings` view (retrieve settings for logged-in user).
     - [ ] Implement `POST /api/zones/settings` view (create/update settings for logged-in user).

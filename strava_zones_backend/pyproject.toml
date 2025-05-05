@@ -17,6 +17,7 @@ dependencies = [
     "requests",
     "python-dotenv",
     "cryptography",
+    "pytz",
 ]
 
 [project.optional-dependencies]
@@ -24,6 +25,9 @@ dev = [
 	"pytest",
 	"pytest-cov",
 	"pytest-mock",
+	"requests-mock",
+    "types-pytz",
+    "types-requests",
 ]
 
 [tool.hatch.build.targets.wheel]
@@ -70,6 +74,7 @@ ignore = [
     "E101",  # Indentation contains mixed spaces and tabs
     "E111",  # Indentation is not a multiple of 4
     "E114",  # Indentation is not a multiple of 4 (comment)
+    "ERA001",  # flaky
     "G004",
     "PLC0206",  # Extracting value from dictionary without calling `.items()` (shady)
     "PLR0402",  # Use `from {module} import {name}` in lieu of alias (can be in clash with our import conventions)

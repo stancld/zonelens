@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Authenticating...</title>
+    <script>
+        function handleAuthCallback() {
+            const token = "{{ token|escapejs }}";
+            const redirectUrl = "{{ frontend_redirect_url|escapejs }}";
+
+            if (token) {
+                try {
+                    localStorage.setItem('authToken', token);
+                    window.location.href = redirectUrl || '/'; // Default redirect
+                } catch (e) {
+                    console.error('Error storing auth token or redirecting:', e);
+                    document.body.innerHTML = 'Error processing authentication. Please contact support.';
+                }
+            } else {
+                console.error('Auth token not found in callback.');
+                document.body.innerHTML = 'Authentication failed. Token not received.';
+            }
+        }
+        window.onload = handleAuthCallback;
+    </script>
+</head>
+<body>
+    <p>Processing authentication, please wait...</p>
+</body>
+</html>

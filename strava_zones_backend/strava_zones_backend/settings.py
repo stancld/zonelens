@@ -64,14 +64,15 @@ ALLOWED_HOSTS = [host for host in ALLOWED_HOSTS if host]
 INSTALLED_APPS = [
 	"django.contrib.admin",
 	"django.contrib.auth",
+	"rest_framework",
+	"rest_framework.authtoken",
 	"django.contrib.contenttypes",
 	"django.contrib.sessions",
 	"django.contrib.messages",
 	"django.contrib.staticfiles",
 	# Third-party apps
-	"rest_framework",
 	# Your apps
-	"api",
+	"api.apps.ApiConfig",
 ]
 
 MIDDLEWARE = [
@@ -89,7 +90,10 @@ ROOT_URLCONF = "strava_zones_backend.urls"
 TEMPLATES = [
 	{
 		"BACKEND": "django.template.backends.django.DjangoTemplates",
-		"DIRS": [],
+		"DIRS": [
+			# Add project-level templates directory
+			BASE_DIR / "templates",
+		],
 		"APP_DIRS": True,
 		"OPTIONS": {
 			"context_processors": [
@@ -175,7 +179,10 @@ REST_FRAMEWORK = {
 	"DEFAULT_RENDERER_CLASSES": [
 		"rest_framework.renderers.JSONRenderer",
 		"rest_framework.renderers.BrowsableAPIRenderer",
-	]
+	],
+	"DEFAULT_AUTHENTICATION_CLASSES": [
+		"rest_framework.authentication.TokenAuthentication",
+	],
 }
 
 # Fernet encryption settings for token storage

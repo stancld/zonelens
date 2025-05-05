@@ -4,60 +4,26 @@ import logging
 import uuid
 from typing import ClassVar
 
-from cryptography.fernet import Fernet
 from django.conf import settings
 from django.core.exceptions import ValidationError  # For model clean method
 from django.db import models
 from django.utils import timezone
 
+from api.utils import decrypt_data, encrypt_data
+
 logger = logging.getLogger(__name__)
-
-# --- Encryption functions (encrypt_data, decrypt_data) ---
-# Ensure FERNET_KEY is configured in settings
-try:
-	# Ensure the key is bytes
-	fernet_key = (
-		settings.FERNET_KEY.encode()
-		if isinstance(settings.FERNET_KEY, str)
-		else settings.FERNET_KEY
-	)
-	if not fernet_key:
-		raise ValueError("FERNET_KEY is not set in Django settings.")
-	cipher_suite = Fernet(fernet_key)
-except (AttributeError, ValueError) as e:
-	logger.error(f"Fernet key configuration error: {e}. Encryption/decryption will fail.")
-	# Fallback or raise error depending on requirements during startup
-	cipher_suite = None
-
-
-def encrypt_data(data) -> str | None:
-	"""Encrypts data using the Fernet cipher suite."""
-	if cipher_suite is None:
-		raise ValueError("Encryption cipher suite not available.")
-	if data is None:
-		return None
-	# Ensure data is bytes
-	data_bytes = data.encode() if isinstance(data, str) else data
-	encrypted_data = cipher_suite.encrypt(data_bytes)
-	return encrypted_data.decode()  # Store as string in db
-
-
-def decrypt_data(encrypted_data):
-	"""Decrypts data using the Fernet cipher suite."""
-	if cipher_suite is None:
-		raise ValueError("Decryption cipher suite not available.")
-	if encrypted_data is None:
-		return None
-	encrypted_bytes = (
-		encrypted_data.encode() if isinstance(encrypted_data, str) else encrypted_data
-	)
-	decrypted_data = cipher_suite.decrypt(encrypted_bytes)
-	return decrypted_data.decode()
 
 
 class StravaUser(models.Model):
 	"""Represents a user authenticated via Strava."""
 
+	user = models.OneToOneField(
+		settings.AUTH_USER_MODEL,
+		on_delete=models.CASCADE,
+		related_name="strava_profile",
+		help_text="Associated Django User",
+		null=True,  # TODO: Generate new migration and enforce not-null
+	)
 	strava_id = models.BigIntegerField(
 		primary_key=True, unique=True, help_text="Strava Athlete ID"
 	)
@@ -81,8 +47,12 @@ class StravaUser(models.Model):
 	def __str__(self) -> str:
 		return f"User {self.strava_id}"
 
+	@classmethod
+	def get_primary_key_field_name(cls) -> str:
+		return "strava_id"
+
 	@property
-	def access_token(self) -> str:
+	def access_token(self) -> str | None:
 		return decrypt_data(self._access_token)
 
 	@access_token.setter
@@ -90,7 +60,7 @@ class StravaUser(models.Model):
 		self._access_token = encrypt_data(value)
 
 	@property
-	def refresh_token(self) -> str:
+	def refresh_token(self) -> str | None:
 		return decrypt_data(self._refresh_token)
 
 	@refresh_token.setter
