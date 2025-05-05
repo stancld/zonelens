@@ -56,7 +56,35 @@ The system comprises three main components:
     *   Stores user-defined **custom HR zone settings** (per activity type).
     *   Stores aggregated weekly and monthly HR zone summaries per user (using a flexible format like JSON to accommodate varying zone counts).
 
-**Data Flow:**
+## Architecture Alternatives Considered
+
+### 1. Pure Client-Side (Extension-Only) Approach
+
+An alternative architecture, similar to applications like Elevate for Strava, involves performing all data fetching, processing, and storage directly within the Chrome Extension itself.
+
+*   **Mechanism:** The extension would handle Strava authentication (using `chrome.identity`), fetch activity/stream data from the Strava API, process it according to user settings (stored in `chrome.storage`), and store the raw or aggregated data locally (potentially using `IndexedDB` or even an embedded analytical engine like DuckDB via WebAssembly).
+*   **Pros:**
+    *   No backend server required (reduced cost and infrastructure).
+    *   Enhanced data privacy (all data remains on the user's machine).
+    *   Potential for powerful client-side analytics if using libraries like DuckDB WASM.
+*   **Cons:**
+    *   Increased extension complexity (managing WASM, `IndexedDB`, client-side processing logic).
+    *   Constrained by browser resources (CPU, RAM) and storage limits.
+    *   No capability for background processing when the browser is closed.
+    *   Difficult to expand to other platforms (web app, mobile) or sync data across devices.
+    *   Potentially slower initial processing compared to a dedicated backend.
+
+### 2. Backend API Approach (Chosen)
+
+The decision was made to proceed with a dedicated backend API.
+
+*   **Justification:** While requiring server infrastructure, this approach offers greater flexibility, scalability, and robustness. It allows for:
+    *   Offloading complex or heavy data processing from the user's browser.
+    *   Potential for background data syncing and pre-processing.
+    *   Centralized data storage, enabling easier future expansion to other platforms or features.
+    *   Simpler extension logic, primarily focused on UI rendering and API communication.
+
+## Data Flow
 
 1.  User installs extension and initiates authentication via a link/button.
 2.  Extension redirects to the backend's `/api/auth/strava` endpoint.
