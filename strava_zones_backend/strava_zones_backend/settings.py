@@ -12,22 +12,51 @@ https://docs.djangoproject.com/en/5.0/ref/settings/
 
 from __future__ import annotations
 
+import logging
+import os
 from pathlib import Path
+
+import dotenv
+
+# Configure basic logging
+logging.basicConfig(
+	level=logging.INFO,
+	format="%(asctime)s [%(levelname)s] %(message)s",
+	handlers=[logging.StreamHandler()],
+)
+logger = logging.getLogger(__name__)
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+# Load environment variables from .env file in the project root
+dotenv_path = BASE_DIR.parent / ".env"
+if dotenv_path.exists():
+	# Override existing env vars with values from .env
+	dotenv.load_dotenv(dotenv_path=dotenv_path, override=True)
+else:
+	logger.warning(
+		"No .env file found at %s. Using environment variables if set elsewhere.", dotenv_path
+	)
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.0/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = "django-insecure-bnaln4e2zu$)$)6nacx7n-j70hsu#)&n74+herx5lfpq#ev0m9"
+SECRET_KEY = os.getenv("SECRET_KEY")
+if not SECRET_KEY:
+	raise ValueError(
+		"SECRET_KEY environment variable is not set. "
+		"Set it in your .env file or environment variables."
+	)
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = os.getenv("DEBUG", "False") == "True"
 
-ALLOWED_HOSTS: list[str] = []
+# Default to empty list if not set
+ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", "").split(",")
+# Filter out empty strings that might result from splitting an empty string
+ALLOWED_HOSTS = [host for host in ALLOWED_HOSTS if host]
 
 
 # Application definition
@@ -39,6 +68,10 @@ INSTALLED_APPS = [
 	"django.contrib.sessions",
 	"django.contrib.messages",
 	"django.contrib.staticfiles",
+	# Third-party apps
+	"rest_framework",
+	# Your apps
+	"api",
 ]
 
 MIDDLEWARE = [
@@ -77,10 +110,23 @@ WSGI_APPLICATION = "strava_zones_backend.wsgi.application"
 
 DATABASES = {
 	"default": {
-		"ENGINE": "django.db.backends.sqlite3",
-		"NAME": BASE_DIR / "db.sqlite3",
+		"ENGINE": os.getenv("DB_ENGINE", "django.db.backends.postgresql"),
+		"NAME": os.getenv("DB_NAME"),
+		"USER": os.getenv("DB_USER"),
+		"PASSWORD": os.getenv("DB_PASSWORD"),
+		"HOST": os.getenv("DB_HOST", "localhost"),
+		"PORT": os.getenv("DB_PORT", "5432"),
 	}
 }
+
+# Check if essential DB details are missing
+if DATABASES["default"]["ENGINE"] == "django.db.backends.postgresql" and not all(
+	[DATABASES["default"]["NAME"], DATABASES["default"]["USER"], DATABASES["default"]["PASSWORD"]]
+):
+	logger.warning(
+		"Missing one or more required database environment variables "
+		"(DB_NAME, DB_USER, DB_PASSWORD). Database connection may fail."
+	)
 
 
 # Password validation
@@ -123,3 +169,22 @@ STATIC_URL = "static/"
 # https://docs.djangoproject.com/en/5.0/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+# Custom Settings for REST Framework
+REST_FRAMEWORK = {
+	"DEFAULT_RENDERER_CLASSES": [
+		"rest_framework.renderers.JSONRenderer",
+		"rest_framework.renderers.BrowsableAPIRenderer",
+	]
+}
+
+# Fernet encryption settings for token storage
+FERNET_KEY = os.getenv("FERNET_KEY")
+if not FERNET_KEY:
+	logger.critical("FERNET_KEY environment variable is not set. Encryption will fail.")
+
+# Strava API credentials
+STRAVA_CLIENT_ID = os.getenv("STRAVA_CLIENT_ID")
+STRAVA_CLIENT_SECRET = os.getenv("STRAVA_CLIENT_SECRET")
+if not STRAVA_CLIENT_ID or not STRAVA_CLIENT_SECRET:
+	logger.warning("STRAVA_CLIENT_ID or STRAVA_CLIENT_SECRET environment variables are not set.")

@@ -4,16 +4,16 @@ This file outlines the development steps and serves as a checklist to track prog
 
 ## Phase 1: Backend Foundation
 
-- [ ] **Initial Setup & Database Models**
+- [x] **Initial Setup & Database Models**
     - [x] Install dependencies (`Django`, `djangorestframework`, `psycopg2-binary`, `requests`, `python-dotenv`, `cryptography`).
     - [x] Initialize Django project (`strava_zones_backend`).
     - [x] Initialize Django app (`api`).
-    - [ ] Define Django model: `User` (Strava ID, encrypted tokens, etc.).
-    - [ ] Define Django model: `CustomZoneSetting` (user FK, activity_type, boundaries JSON/TextField).
-    - [ ] Define Django model: `ZoneSummary` (user FK, year, month, week, zone_data JSON/TextField).
-    - [ ] Configure `settings.py` for `api` app, `rest_framework`, and database connection (using `.env`).
-    - [ ] Create initial database migrations (`makemigrations api`).
-    - [ ] Apply initial database migrations (`migrate`).
+    - [x] Define Django model: `User` (Strava ID, encrypted tokens, etc.).
+    - [x] Define Django model: `CustomZoneSetting` (user FK, activity_type, boundaries JSON/TextField).
+    - [x] Define Django model: `ZoneSummary` (user FK, year, month, week, zone_data JSON/TextField).
+    - [x] Configure `settings.py` for `api` app, `rest_framework`, and database connection (using `.env`).
+    - [x] Create initial database migrations (`makemigrations api`).
+    - [x] Apply initial database migrations (`migrate`).
 - [ ] **Strava Authentication**
     - [ ] Register application on Strava Developers (get Client ID/Secret).
     *   [ ] Store Client ID/Secret securely (e.g., in `.env`).
