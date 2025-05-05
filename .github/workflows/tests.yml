@@ -1,0 +1,60 @@
+name: Tests
+
+# see: https://help.github.com/en/actions/reference/events-that-trigger-workflows
+on:  # Trigger the workflow on push or pull request, but only for the master branch
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+jobs:
+  unitests:
+    runs-on: ubuntu-24.04
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_DB: strava_zones_db
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: db_password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres" --health-interval=10s --health-timeout=5s --health-retries=5
+    env:
+      SECRET_KEY: django-insecure-ci-secret-key
+      DEBUG: "True"
+      DB_NAME: strava_zones_db
+      DB_USER: postgres
+      DB_PASSWORD: db_password
+      DB_HOST: localhost
+      DB_PORT: "5432"
+      FERNET_KEY: ${{ secrets.FERNET_KEY }}
+      STRAVA_CLIENT_ID: ci-client-id
+      STRAVA_CLIENT_SECRET: ci-client-secret
+    steps:
+      - uses: actions/checkout@master
+      - uses: actions/setup-python@v5
+        with:
+          python-version: 3.12
+      - name: Install dependencies
+        run: |
+          cd strava_zones_backend
+          pip install -e '.[dev]' -c constraints.txt
+        shell: bash
+      - name: Run tests
+        run: |
+          cd strava_zones_backend
+          coverage run --source='.' manage.py test api
+      - name: Coverage statistics
+        if: success()
+        run: |
+          cd strava_zones_backend
+          coverage xml
+          coverage report
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          file: ./coverage.xml
+          name: codecov-umbrella
