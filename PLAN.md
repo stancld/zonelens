@@ -7,7 +7,7 @@ This file outlines the development steps and serves as a checklist to track prog
 - [ ] **Initial Setup & Database Models**
     - [x] Install dependencies (`Django`, `djangorestframework`, `psycopg2-binary`, `requests`, `python-dotenv`, `cryptography`).
     - [x] Initialize Django project (`strava_zones_backend`).
-    - [ ] Initialize Django app (`api`).
+    - [x] Initialize Django app (`api`).
     - [ ] Define Django model: `User` (Strava ID, encrypted tokens, etc.).
     - [ ] Define Django model: `CustomZoneSetting` (user FK, activity_type, boundaries JSON/TextField).
     - [ ] Define Django model: `ZoneSummary` (user FK, year, month, week, zone_data JSON/TextField).
