@@ -14,5 +14,20 @@ services:
     ports:
       - ${DB_PORT-5432}:5432
 
+  test-backend:
+    build:
+      context: ./strava_zones_backend
+      dockerfile: Dockerfile.dev
+    container_name: strava-test-backend
+    depends_on:
+      - postgres
+    env_file:
+      - .env
+    environment:
+      DB_HOST: postgres
+    command: >
+      sh -c "coverage run --source='.' manage.py test api --force-color &&
+             coverage report --fail-under=65"
+
 volumes:
   postgres_data:
