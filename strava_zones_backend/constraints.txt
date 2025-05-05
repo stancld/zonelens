@@ -1,0 +1,16 @@
+asgiref==3.8.1
+certifi==2025.4.26
+cffi==1.17.1
+charset-normalizer==3.4.2
+cryptography==44.0.3
+django==5.2
+djangorestframework==3.16.0
+idna==3.10
+psycopg2-binary==2.9.10
+pycparser==2.22
+python-dotenv==1.1.0
+requests==2.32.3
+setuptools==80.1.0
+sqlparse==0.5.3
+urllib3==2.4.0
+wheel==0.45.1
