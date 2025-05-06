@@ -22,12 +22,12 @@ from api.serializers import CustomZonesConfigSerializer
 from api.utils import encrypt_data
 
 if TYPE_CHECKING:
-	from typing import Annotated, TypedDict
+	from typing import TypedDict
 
 	from django.db.models import QuerySet
 	from rest_framework.request import Request
 
-	Secret = Annotated[str, "credential"]
+	from api.types import Secret
 
 	class TokenPayload(TypedDict):
 		client_id: str
