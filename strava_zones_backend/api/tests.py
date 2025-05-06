@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from datetime import datetime
+from unittest.mock import MagicMock, patch
 from urllib.parse import urlparse
 
 import requests_mock
@@ -17,7 +18,9 @@ from api.models import CustomZonesConfig, StravaUser, ZoneSummary
 from api.strava_client import (
 	STRAVA_API_ACTIVITIES_URL,
 	STRAVA_API_MAX_PER_PAGE,
+	STRAVA_API_STREAMS_URL_TEMPLATE,
 	STRAVA_TOKEN_URL,
+	fetch_activity_streams,
 	fetch_all_strava_activities,
 )
 from api.utils import decrypt_data, encrypt_data
@@ -505,3 +508,38 @@ class StravaClientFunctionTests(TestCase):
 		self.assertEqual(activity_calls[1].qs["page"], ["1"])
 		self.assertEqual(activity_calls[2].qs["page"], ["2"])
 		self.assertEqual(activity_calls[3].qs["page"], ["3"])
+
+	@patch("api.strava_client.StravaHttpRequestClient.get")
+	def test_fetch_activity_streams_success(self, mock_strava_get: MagicMock) -> None:
+		"""Test successfully fetching activity streams."""
+		activity_id = 1234567890
+		mock_stream_data = {
+			"time": {"data": [0, 1, 2, 3], "original_size": 4},
+			"heartrate": {"data": [120, 122, 125, 128], "original_size": 4},
+		}
+
+		# Configure the mock response object
+		mock_response = MagicMock()
+		mock_response.json.return_value = mock_stream_data
+		mock_response.raise_for_status = MagicMock()  # Ensure it doesn't raise an error
+		mock_strava_get.return_value = mock_response
+
+		# Ensure the StravaUser has an access token for the test
+		# The setUp method already provides self.strava_user with encrypted tokens.
+		# We can assume the .access_token property decrypts it.
+		self.strava_user._access_token = encrypt_data("test_valid_access_token")
+		self.strava_user.save()
+
+		streams = fetch_activity_streams(self.strava_user, activity_id)
+
+		self.assertIsNotNone(streams)
+		self.assertEqual(streams, mock_stream_data)
+
+		expected_url = STRAVA_API_STREAMS_URL_TEMPLATE.format(activity_id=activity_id)
+		expected_params = {"keys": "heartrate,time", "key_by_type": "true"}
+
+		mock_strava_get.assert_called_once_with(
+			url=expected_url,
+			access_token="test_valid_access_token",  # This should be the decrypted token
+			params=expected_params,
+		)

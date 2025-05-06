@@ -23,10 +23,24 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+# Strava API Endpoints
 STRAVA_API_BASE_URL = "https://www.strava.com/api/v3"
-STRAVA_API_ACTIVITIES_URL = f"{STRAVA_API_BASE_URL}/athlete/activities"
 STRAVA_TOKEN_URL = f"{STRAVA_API_BASE_URL}/oauth/token"
+STRAVA_API_ACTIVITIES_URL = f"{STRAVA_API_BASE_URL}/athlete/activities"
+STRAVA_API_STREAMS_URL_TEMPLATE = f"{STRAVA_API_BASE_URL}/activities/{{activity_id}}/streams"
+
+# Default per_page, Strava API max is 200
 STRAVA_API_MAX_PER_PAGE = 200
+
+
+class StravaHttpRequestClient:
+	@staticmethod
+	def get(
+		url: str, access_token: str, params: dict[str, Any] | None = None
+	) -> requests.Response:
+		return requests.get(
+			url, headers={"Authorization": f"Bearer {access_token}"}, params=params
+		)
 
 
 def refresh_strava_token(strava_user: StravaUser) -> bool:
@@ -90,16 +104,18 @@ def fetch_strava_activities(
 			logger.error(f"User {strava_user.strava_id} has no access token & refresh failed.")
 			return None
 
-	headers = {"Authorization": f"Bearer {strava_user.access_token}"}
 	params: dict[str, int | str] = {"page": page, "per_page": per_page}
-
 	if before is not None:
 		params["before"] = before
 	if after is not None:
 		params["after"] = after
 
 	try:
-		response = requests.get(STRAVA_API_ACTIVITIES_URL, headers=headers, params=params)
+		response = StravaHttpRequestClient.get(
+			STRAVA_API_ACTIVITIES_URL,
+			access_token=strava_user.access_token,  # type: ignore[arg-type]
+			params=params,
+		)
 		response.raise_for_status()
 		return response.json()
 	except requests.exceptions.HTTPError as e:
@@ -110,10 +126,11 @@ def fetch_strava_activities(
 			logger.info(f"401 for user {strava_user.strava_id}. Refreshing token.")
 			if refresh_strava_token(strava_user):
 				logger.info(f"Token refreshed for {strava_user.strava_id}. Retrying.")
-				headers["Authorization"] = f"Bearer {strava_user.access_token}"
 				try:
-					response = requests.get(
-						STRAVA_API_ACTIVITIES_URL, headers=headers, params=params
+					response = StravaHttpRequestClient.get(
+						STRAVA_API_ACTIVITIES_URL,
+						access_token=strava_user.access_token,  # type: ignore[arg-type]
+						params=params,
 					)
 					response.raise_for_status()
 					return response.json()
@@ -200,6 +217,83 @@ def fetch_all_strava_activities(
 		page += 1
 
 	return all_activities
+
+
+def fetch_activity_streams(
+	strava_user: StravaUser, activity_id: int, attempt_refresh: bool = True
+) -> dict[str, Any] | None:
+	"""
+	Fetches specified streams (heartrate, time) for a given activity from the Strava API.
+
+	Additional parameters
+	---------------------
+		activity_id
+			The ID of the activity for which to fetch streams.
+		attempt_refresh
+			If True, try to refresh the token on a 401 error.
+
+	Returns
+	-------
+		A dictionary containing the stream data (e.g., {'time': {...}, 'heartrate': {...}})
+		or None if an error occurs or streams are not available.
+	"""
+	access_token = strava_user.access_token
+	if not access_token:
+		logger.error(f"No access token available for Strava user {strava_user.strava_id}.")
+		return None
+
+	params = {"keys": "heartrate,time", "key_by_type": "true"}
+
+	logger.info(
+		f"Fetching HR/Time streams for activity {activity_id} for user {strava_user.strava_id}."
+	)
+
+	try:
+		response = StravaHttpRequestClient.get(
+			url=STRAVA_API_STREAMS_URL_TEMPLATE.format(activity_id=activity_id),
+			access_token=access_token,
+			params=params,
+		)
+		response.raise_for_status()  # Raise HTTPError for bad responses (4XX or 5XX)
+		streams_data = response.json()
+		logger.debug(
+			f"Successfully fetched streams for activity {activity_id}. "
+			f"Streams received: {list(streams_data.keys())}"
+		)
+		return streams_data
+	except requests.exceptions.HTTPError as e:
+		if e.response is not None and e.response.status_code == 401 and attempt_refresh:
+			logger.warning(
+				f"Token expired/invalid for user {strava_user.strava_id} "
+				f"while fetching streams for activity {activity_id}. Attempting refresh."
+			)
+			if refresh_strava_token(strava_user):
+				logger.info(f"Token refreshed. Retrying stream fetch for activity {activity_id}.")
+				return fetch_activity_streams(strava_user, activity_id, attempt_refresh=False)
+			logger.error(
+				f"Token refresh failed for user {strava_user.strava_id}. "
+				f"Cannot fetch streams for activity {activity_id}."
+			)
+		if e.response is not None and e.response.status_code == 404:
+			logger.warning(
+				f"Act {activity_id} not found/no streams (user {strava_user.strava_id})."
+				f" Details: {e.response.text}"
+			)
+		logger.error(
+			f"HTTP err for act {activity_id} (user {strava_user.strava_id}): {e}. "
+			f"Response: {e.response.text if e.response else 'N/A'}"
+		)
+	except requests.exceptions.RequestException as e:
+		logger.error(
+			f"Request error fetching streams for activity {activity_id} "
+			f"for user {strava_user.strava_id}: {e}"
+		)
+	except ValueError as e:  # Includes JSONDecodeError
+		logger.error(
+			f"Error decoding JSON response for activity streams {activity_id} "
+			f"for user {strava_user.strava_id}: {e}"
+		)
+	return None
 
 
 def _generate_refresh_token_payload(refresh_token: str) -> RefreshTokenPayload:
