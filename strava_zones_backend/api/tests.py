@@ -129,10 +129,10 @@ class AuthViewTests(APITestCase):
 		self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
 	@requests_mock.Mocker()
-	def test_strava_callback_success(self, m):
+	def test_strava_callback_success(self, mocker: requests_mock.Mocker) -> None:
 		"""Test successful Strava callback and token generation."""
 		# Mock the Strava token exchange endpoint
-		m.post(
+		mocker.post(
 			"https://www.strava.com/oauth/token",
 			json=MOCK_STRAVA_TOKEN_RESPONSE,
 			status_code=status.HTTP_200_OK,
@@ -150,10 +150,11 @@ class AuthViewTests(APITestCase):
 		self.assertIn("frontend_redirect_url", response.context)
 
 		# Verify Django User and StravaUser were created
-		strava_id = MOCK_STRAVA_TOKEN_RESPONSE["athlete"]["id"]
+		strava_id = MOCK_STRAVA_TOKEN_RESPONSE["athlete"]["id"]  # type: ignore[index]
 		django_user = get_user_model().objects.get(username=f"strava_{strava_id}")
 		self.assertEqual(
-			django_user.first_name, MOCK_STRAVA_TOKEN_RESPONSE["athlete"]["firstname"]
+			django_user.first_name,
+			MOCK_STRAVA_TOKEN_RESPONSE["athlete"]["firstname"],  # type: ignore[index]
 		)
 		strava_user = StravaUser.objects.get(strava_id=strava_id)
 		self.assertEqual(strava_user.user, django_user)
@@ -167,7 +168,7 @@ class AuthViewTests(APITestCase):
 		self.assertNotEqual(strava_user._access_token, "test_access_token_123")
 		self.assertTrue(len(strava_user._access_token) > 50)  # Encrypted tokens are longer
 
-	def test_strava_callback_strava_error(self):
+	def test_strava_callback_strava_error(self) -> None:
 		"""Test Strava callback when Strava returns an error parameter."""
 		callback_url = reverse("strava_callback")
 		response = self.client.get(callback_url, {"error": "access_denied"})
@@ -175,10 +176,10 @@ class AuthViewTests(APITestCase):
 		self.assertIn(b"Error received from Strava: access_denied", response.content)
 
 	@requests_mock.Mocker()
-	def test_strava_callback_token_exchange_error(self, m):
+	def test_strava_callback_token_exchange_error(self, mocker: requests_mock.Mocker) -> None:
 		"""Test Strava callback when token exchange fails."""
 		# Mock the Strava token exchange endpoint to return an error
-		m.post(
+		mocker.post(
 			"https://www.strava.com/oauth/token",
 			json=MOCK_STRAVA_ERROR_RESPONSE,
 			status_code=status.HTTP_400_BAD_REQUEST,
@@ -194,7 +195,7 @@ class AuthViewTests(APITestCase):
 
 
 class UtilTests(TestCase):
-	def test_encryption_decryption(self):
+	def test_encryption_decryption(self) -> None:
 		"""Test that encrypt_data and decrypt_data work correctly."""
 		original_data = "my_secret_access_token"
 		encrypted = encrypt_data(original_data)
@@ -204,17 +205,17 @@ class UtilTests(TestCase):
 		self.assertTrue(isinstance(encrypted, str))  # Ensure it returns string
 		self.assertEqual(original_data, decrypted)
 
-	def test_decrypt_empty_string(self):
+	def test_decrypt_empty_string(self) -> None:
 		"""Test decrypting an empty string returns an empty string."""
 		self.assertEqual(decrypt_data(""), "")
 
-	def test_encrypt_empty_string(self):
+	def test_encrypt_empty_string(self) -> None:
 		"""Test encrypting an empty string returns an empty string."""
 		self.assertEqual(encrypt_data(""), "")
 
 
 class StravaUserModelTests(TestCase):
-	def test_token_properties_encryption(self):
+	def test_token_properties_encryption(self) -> None:
 		"""Test the access_token and refresh_token properties handle encryption."""
 		strava_user = StravaUser(strava_id=1111)
 		access_token_plain = "access_123"
@@ -233,7 +234,7 @@ class StravaUserModelTests(TestCase):
 		self.assertEqual(strava_user.access_token, access_token_plain)
 		self.assertEqual(strava_user.refresh_token, refresh_token_plain)
 
-	def test_token_properties_empty(self):
+	def test_token_properties_empty(self) -> None:
 		"""Test token properties handle empty values correctly."""
 		strava_user = StravaUser(strava_id=2222)
 
@@ -247,3 +248,78 @@ class StravaUserModelTests(TestCase):
 		strava_user_default = StravaUser(strava_id=3333)
 		self.assertEqual(strava_user_default.access_token, "")
 		self.assertEqual(strava_user_default.refresh_token, "")
+
+
+class CustomZonesSettingsViewTests(APITestCase):
+	def setUp(self) -> None:
+		"""Set up a user, StravaUser, and token for authentication."""
+		self.django_user = get_user_model().objects.create_user(
+			username="testuser_zones", password="password123"
+		)
+		self.strava_user = StravaUser.objects.create(
+			user=self.django_user,
+			strava_id=112233,
+			_access_token=encrypt_data("dummy_access"),
+			_refresh_token=encrypt_data("dummy_refresh"),
+			token_expires_at=timezone.now() + timezone.timedelta(hours=1),
+			scope="read,activity:read_all",
+		)
+		self.token = Token.objects.create(user=self.django_user)
+		self.client.credentials(HTTP_AUTHORIZATION=f"Token {self.token.key}")
+		self.url = reverse("zone_settings_list_create")
+		self.sample_payload = {
+			"activity_type": "RUN",
+			"zones_definition": [
+				{"name": "Z1", "min_hr": 100, "max_hr": 120, "order": 1},
+				{"name": "Z2", "min_hr": 121, "max_hr": 140, "order": 2},
+			],
+		}
+
+	def test_get_zone_settings_unauthenticated(self) -> None:
+		self.client.credentials()  # Clear credentials
+		response = self.client.get(self.url)
+		self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+	def test_get_zone_settings_authenticated_empty(self) -> None:
+		response = self.client.get(self.url)
+		self.assertEqual(response.status_code, status.HTTP_200_OK)
+		self.assertEqual(response.data, [])
+
+	def test_post_zone_settings_unauthenticated(self) -> None:
+		self.client.credentials()  # Clear credentials
+		response = self.client.post(self.url, self.sample_payload, format="json")
+		self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+	def test_post_zone_settings_success(self) -> None:
+		response = self.client.post(self.url, self.sample_payload, format="json")
+		self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+		self.assertEqual(response.data["activity_type"], "RUN")
+		self.assertEqual(len(response.data["zones_definition"]), 2)
+		self.assertEqual(response.data["zones_definition"][0]["name"], "Z1")
+		self.assertTrue(CustomZonesConfig.objects.filter(user=self.strava_user).exists())
+		config = CustomZonesConfig.objects.get(user=self.strava_user)
+		self.assertEqual(config.zones_definition.count(), 2)
+
+	def test_post_zone_settings_invalid_payload_missing_activity_type(self) -> None:
+		payload = self.sample_payload.copy()
+		del payload["activity_type"]
+		response = self.client.post(self.url, payload, format="json")
+		self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+		self.assertIn("activity_type", response.data)
+
+	def test_post_zone_settings_invalid_payload_malformed_zones(self) -> None:
+		payload = {
+			"activity_type": "RIDE",
+			"zones_definition": [{"name": "Z1"}],  # Missing min_hr, max_hr, order
+		}
+		response = self.client.post(self.url, payload, format="json")
+		self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+		self.assertIn("zones_definition", response.data)
+
+	def test_get_zone_settings_after_post(self) -> None:
+		self.client.post(self.url, self.sample_payload, format="json")  # Create one
+		response = self.client.get(self.url)
+		self.assertEqual(response.status_code, status.HTTP_200_OK)
+		self.assertEqual(len(response.data), 1)
+		self.assertEqual(response.data[0]["activity_type"], "RUN")
+		self.assertEqual(len(response.data[0]["zones_definition"]), 2)

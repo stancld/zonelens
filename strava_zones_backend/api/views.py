@@ -10,18 +10,21 @@ from django.contrib.auth import get_user_model
 from django.http import HttpRequest, HttpResponse, HttpResponseBadRequest, HttpResponseRedirect
 from django.shortcuts import render
 from django.utils import timezone
+from rest_framework import generics
 from rest_framework.authentication import TokenAuthentication
 from rest_framework.authtoken.models import Token
 from rest_framework.decorators import api_view, authentication_classes, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
-from api.models import StravaUser
+from api.models import CustomZonesConfig, StravaUser
+from api.serializers import CustomZonesConfigSerializer
 from api.utils import encrypt_data
 
 if TYPE_CHECKING:
 	from typing import Annotated, TypedDict
 
+	from django.db.models import QuerySet
 	from rest_framework.request import Request
 
 	Secret = Annotated[str, "credential"]
@@ -42,9 +45,7 @@ STRAVA_TOKEN_URL = "https://www.strava.com/oauth/token"
 def strava_authorize(request: HttpRequest) -> HttpResponseRedirect:  # noqa: ARG001
 	"""Redirects the user to Strava's authorization page."""
 	scopes = "read,activity:read_all,profile:read_all"
-	# TODO: Ensure STRAVA_CLIENT_ID is loaded into settings
 	client_id = settings.STRAVA_CLIENT_ID
-	# TODO: Replace with actual callback URL, potentially from settings
 	redirect_uri = "http://127.0.0.1:8000/api/auth/strava/callback"
 
 	params = {
@@ -65,7 +66,6 @@ def strava_callback(request: HttpRequest) -> HttpResponse:
 
 	if not (code := request.GET.get("code")):
 		return HttpResponse("Authorization code not found in callback.", status=400)
-
 	try:
 		response = requests.post(STRAVA_TOKEN_URL, data=_generate_token_payload(code), timeout=10)
 
@@ -74,8 +74,6 @@ def strava_callback(request: HttpRequest) -> HttpResponse:
 
 		token_data = response.json()
 
-		# Temporarily store athlete data if needed, or just proceed
-		# For now, focus on getting the token and user association right
 		athlete_info = token_data.get("athlete", {})
 		strava_id = athlete_info.get("id")
 
@@ -91,10 +89,8 @@ def strava_callback(request: HttpRequest) -> HttpResponse:
 			request=request,
 		)
 
-		# Create or get the DRF token for API authentication
 		drf_token, _ = Token.objects.get_or_create(user=user)
 
-		# Render the template to pass the token back to the frontend
 		context = {"token": drf_token.key, "frontend_redirect_url": "/"}
 		return render(request, "api/auth_callback.html", context)
 	except requests.exceptions.HTTPError:
@@ -152,6 +148,10 @@ def index_view(request: HttpRequest) -> HttpResponse:
 def user_profile(request: Request) -> Response:
 	"""Returns basic profile info for the authenticated user."""
 	user = request.user
+	api_token = None
+	if request.auth:
+		api_token = request.auth.key
+
 	return Response(
 		{
 			"username": user.username,
@@ -160,5 +160,22 @@ def user_profile(request: Request) -> Response:
 			"strava_id": user.strava_profile.strava_id
 			if hasattr(user, "strava_profile")
 			else None,
+			"api_token": api_token,
 		}
 	)
+
+
+class CustomZonesSettingsView(generics.ListCreateAPIView):
+	"""Retrieve or create custom zone configurations for the authenticated user."""
+
+	serializer_class = CustomZonesConfigSerializer
+	permission_classes = [IsAuthenticated]
+
+	def get_queryset(self) -> QuerySet[CustomZonesConfig]:
+		"""Return a list of all custom zone configs for the authenticated user."""
+		user = self.request.user
+		if hasattr(user, "strava_profile") and user.strava_profile:
+			return CustomZonesConfig.objects.filter(user=user.strava_profile).order_by(
+				"activity_type"
+			)
+		return CustomZonesConfig.objects.none()

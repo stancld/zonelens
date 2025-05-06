@@ -25,11 +25,11 @@ This file outlines the development steps and serves as a checklist to track prog
         - [x] Create or update `User` record in the database.
         - [x] Implement basic session/token management for *our* backend.
     - [x] Add URL patterns for auth views.
-- [ ] **Custom Zone Settings API**
-    - [ ] Implement `GET /api/zones/settings` view (retrieve settings for logged-in user).
-    - [ ] Implement `POST /api/zones/settings` view (create/update settings for logged-in user).
-    - [ ] Add URL patterns for settings views.
-    - [ ] Add serializers (DRF) for `CustomZoneSetting`.
+- [x] **Custom Zone Settings API**
+    - [x] Implement `GET /api/zones/settings` view (retrieve settings for logged-in user).
+    - [x] Implement `POST /api/zones/settings` view (create/update settings for logged-in user).
+    - [x] Add URL patterns for settings views.
+    - [x] Add serializers (DRF) for `CustomZoneSetting`.
 
 ## Phase 2: Backend Core Logic
 
