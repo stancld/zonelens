@@ -8,4 +8,9 @@ urlpatterns = [
 	path("profile/", views.user_profile, name="user_profile"),
 	path("auth/strava/", views.strava_authorize, name="strava_authorize"),
 	path("auth/strava/callback/", views.strava_callback, name="strava_callback"),
+	path(
+		"zones/settings/",
+		views.CustomZonesSettingsView.as_view(),
+		name="zone_settings_list_create",
+	),
 ]
