@@ -2,10 +2,11 @@ from __future__ import annotations
 
 import json
 from datetime import datetime
+from urllib.parse import urlparse
 
 import requests_mock
 from django.contrib.auth import get_user_model
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 from rest_framework import status
@@ -13,6 +14,12 @@ from rest_framework.authtoken.models import Token
 from rest_framework.test import APITestCase
 
 from api.models import CustomZonesConfig, StravaUser, ZoneSummary
+from api.strava_client import (
+	STRAVA_API_ACTIVITIES_URL,
+	STRAVA_API_MAX_PER_PAGE,
+	STRAVA_TOKEN_URL,
+	fetch_all_strava_activities,
+)
 from api.utils import decrypt_data, encrypt_data
 
 
@@ -110,7 +117,12 @@ class AuthViewTests(APITestCase):
 		# Create a user and associated token first
 		user = get_user_model().objects.create_user(username="testuser", password="password")
 		_strava_user = StravaUser.objects.create(
-			strava_id=98765, user=user, token_expires_at=timezone.now()
+			user=user,
+			strava_id=98765,
+			_access_token=encrypt_data("dummy_access"),
+			_refresh_token=encrypt_data("dummy_refresh"),
+			token_expires_at=timezone.now() + timezone.timedelta(hours=1),
+			scope="read,activity:read_all",
 		)
 		token = Token.objects.create(user=user)
 
@@ -323,3 +335,173 @@ class CustomZonesSettingsViewTests(APITestCase):
 		self.assertEqual(len(response.data), 1)
 		self.assertEqual(response.data[0]["activity_type"], "RUN")
 		self.assertEqual(len(response.data[0]["zones_definition"]), 2)
+
+
+class StravaClientFunctionTests(TestCase):
+	def setUp(self) -> None:
+		"""Set up a user and StravaUser for testing client functions."""
+		self.django_user = get_user_model().objects.create_user(
+			username="test_strava_client_user", password="password"
+		)
+		self.strava_user = StravaUser.objects.create(
+			user=self.django_user,
+			strava_id=78910,
+			token_expires_at=timezone.now() + timezone.timedelta(hours=1),
+			scope="activity:read_all",
+		)
+		# Set tokens using the property setters to ensure encryption
+		self.strava_user.access_token = "mock_valid_access_token"
+		self.strava_user.refresh_token = "mock_valid_refresh_token"
+		self.strava_user.save()
+
+	@requests_mock.Mocker()
+	def test_fetch_all_acts_multiple_pages_no_refresh(self, mocker: requests_mock.Mocker) -> None:
+		"""Test fetching all activities across multiple pages without token refresh."""
+		# Mock activities data
+		mock_activities_page1 = [
+			{"id": i, "name": f"Act {i}"} for i in range(1, STRAVA_API_MAX_PER_PAGE + 1)
+		]
+		mock_activities_page2 = [
+			{"id": i, "name": f"Act {i}"}
+			for i in range(STRAVA_API_MAX_PER_PAGE + 1, STRAVA_API_MAX_PER_PAGE + 11)
+		]
+
+		# Mock GET requests for activities
+		mocker.get(
+			STRAVA_API_ACTIVITIES_URL,
+			[
+				{"json": mock_activities_page1, "status_code": 200},
+				{"json": mock_activities_page2, "status_code": 200},
+				{"json": [], "status_code": 200},  # Empty list to terminate
+			],
+		)
+
+		# Mock POST request for token refresh (we assert it's not called)
+		mocker.post(STRAVA_TOKEN_URL, status_code=200, json=MOCK_STRAVA_TOKEN_RESPONSE)
+
+		all_activities = fetch_all_strava_activities(self.strava_user)
+
+		self.assertIsNotNone(all_activities)
+		self.assertEqual(len(all_activities), STRAVA_API_MAX_PER_PAGE + 10)  # type: ignore[arg-type]
+		self.assertEqual(all_activities[0]["id"], 1)  # type: ignore[index]
+		self.assertEqual(all_activities[-1]["id"], STRAVA_API_MAX_PER_PAGE + 10)  # type: ignore[index]
+
+		# Check calls to GET /activities
+		activity_url_path = urlparse(STRAVA_API_ACTIVITIES_URL).path
+		activity_calls = [
+			call
+			for call in mocker.request_history
+			if call.path == activity_url_path and call.method == "GET"
+		]
+		self.assertEqual(len(activity_calls), 3)
+
+		# Check page parameters in GET requests
+		self.assertEqual(activity_calls[0].qs["page"], ["1"])
+		self.assertEqual(activity_calls[0].qs["per_page"], [str(STRAVA_API_MAX_PER_PAGE)])
+		self.assertEqual(activity_calls[1].qs["page"], ["2"])
+		self.assertEqual(activity_calls[1].qs["per_page"], [str(STRAVA_API_MAX_PER_PAGE)])
+		self.assertEqual(activity_calls[2].qs["page"], ["3"])
+		self.assertEqual(activity_calls[2].qs["per_page"], [str(STRAVA_API_MAX_PER_PAGE)])
+
+		# Check that token refresh was not called
+		token_url_path = urlparse(STRAVA_TOKEN_URL).path
+		refresh_calls = [
+			call
+			for call in mocker.request_history
+			if call.path == token_url_path and call.method == "POST"
+		]
+		self.assertEqual(len(refresh_calls), 0)
+
+	@override_settings(
+		STRAVA_CLIENT_ID="test_client_id", STRAVA_CLIENT_SECRET="test_client_secret"
+	)
+	@requests_mock.Mocker()
+	def test_fetch_all_acts_token_refresh_success(self, mocker: requests_mock.Mocker) -> None:
+		"""Test fetching all activities with a successful token refresh mid-fetch."""
+		from api.strava_client import (
+			STRAVA_API_ACTIVITIES_URL,
+			STRAVA_API_MAX_PER_PAGE,
+			STRAVA_TOKEN_URL,
+			fetch_all_strava_activities,
+		)
+
+		# Simulate an expired token
+		self.strava_user.token_expires_at = timezone.now() - timezone.timedelta(hours=1)
+		self.strava_user.save()
+
+		# Mock activities data
+		mock_activities_page1 = [
+			{"id": i, "name": f"Act {i}"} for i in range(1, STRAVA_API_MAX_PER_PAGE + 1)
+		]
+		mock_activities_page2 = [
+			{"id": i, "name": f"Act {i}"}
+			for i in range(STRAVA_API_MAX_PER_PAGE + 1, STRAVA_API_MAX_PER_PAGE + 11)
+		]
+
+		# Mock response for successful token refresh
+		new_access_token = "new_mock_access_token_refreshed"
+		new_refresh_token = "new_mock_refresh_token_refreshed"
+		new_expires_at = int((timezone.now() + timezone.timedelta(hours=6)).timestamp())
+		mock_refresh_response = {
+			"access_token": new_access_token,
+			"refresh_token": new_refresh_token,
+			"expires_at": new_expires_at,
+		}
+		mocker.post(STRAVA_TOKEN_URL, json=mock_refresh_response, status_code=200)
+
+		# Mock GET requests for activities:
+		# 1. Initial call with old token -> 401
+		# 2. Call with new token -> page 1
+		# 3. Call with new token -> page 2
+		# 4. Call with new token -> empty page
+		mocker.get(
+			STRAVA_API_ACTIVITIES_URL,
+			[
+				{"status_code": 401, "json": {"message": "Unauthorized"}},  # Initial 401
+				{"json": mock_activities_page1, "status_code": 200},  # Retry for page 1
+				{"json": mock_activities_page2, "status_code": 200},  # Page 2
+				{"json": [], "status_code": 200},  # Empty list to terminate
+			],
+		)
+
+		all_activities = fetch_all_strava_activities(self.strava_user)
+
+		self.assertIsNotNone(all_activities)
+		self.assertEqual(len(all_activities), STRAVA_API_MAX_PER_PAGE + 10)  # type: ignore[arg-type]
+
+		# Check that token refresh was called once
+		token_url_path = urlparse(STRAVA_TOKEN_URL).path
+		refresh_calls = [
+			call
+			for call in mocker.request_history
+			if call.path == token_url_path and call.method == "POST"
+		]
+		self.assertEqual(len(refresh_calls), 1)
+
+		# Verify StravaUser tokens were updated
+		self.strava_user.refresh_from_db()
+		self.assertEqual(self.strava_user.access_token, new_access_token)
+		self.assertEqual(self.strava_user.refresh_token, new_refresh_token)
+		# Compare timestamps directly for expires_at
+		self.assertEqual(self.strava_user.token_expires_at.timestamp(), new_expires_at)
+
+		# Check calls to GET /activities
+		activity_url_path = urlparse(STRAVA_API_ACTIVITIES_URL).path
+		activity_calls = [
+			call
+			for call in mocker.request_history
+			if call.path == activity_url_path and call.method == "GET"
+		]
+		self.assertEqual(len(activity_calls), 4)  # 1 fail (401), 3 success
+
+		# Check Authorization header for successful calls used the new token
+		# The first call in activity_calls list would be the 401, so we skip it.
+		expected_auth_header = f"Bearer {new_access_token}"
+		for i in range(1, len(activity_calls)):
+			self.assertEqual(activity_calls[i].headers["Authorization"], expected_auth_header)
+
+		# Check page parameters for successful calls
+		# activity_calls[0] is the 401 error, so we check from activity_calls[1]
+		self.assertEqual(activity_calls[1].qs["page"], ["1"])
+		self.assertEqual(activity_calls[2].qs["page"], ["2"])
+		self.assertEqual(activity_calls[3].qs["page"], ["3"])

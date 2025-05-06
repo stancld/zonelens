@@ -34,8 +34,8 @@ This file outlines the development steps and serves as a checklist to track prog
 ## Phase 2: Backend Core Logic
 
 - [ ] **Strava Data Fetching Utilities**
-    - [ ] Create utility/service function to get valid Strava access token (handle refresh if needed).
-    - [ ] Create utility/service function to fetch activities for a user/period (`GET /athlete/activities`).
+    - [x] Create utility/service function to get valid Strava access token (handle refresh if needed).
+    - [x] Create utility/service function to fetch activities for a user/period (`GET /athlete/activities`).
     - [ ] Create utility/service function to fetch HR stream for an activity (`GET /activities/{id}/streams?keys=heartrate,time`).
 - [ ] **HR Stream Processing**
     - [ ] Implement logic to parse HR stream data.
@@ -94,7 +94,7 @@ This file outlines the development steps and serves as a checklist to track prog
 
 ## Phase 5: Refinement
 
-- [ ] Implement Strava token refresh logic in the backend.
+- [x] Implement Strava token refresh logic in the backend.
 - [ ] Add comprehensive error handling (API limits, network errors, backend errors, extension errors).
 - [ ] Improve UI/UX of the extension popup, options page, and injected plots.
 - [ ] Add backend tests (unit/integration, especially for processing logic).
