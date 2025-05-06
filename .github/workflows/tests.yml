@@ -53,8 +53,9 @@ jobs:
           coverage xml
           coverage report
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v3
+        uses: codecov/codecov-action@v5
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
+          slug: stancld/strava-zones
           file: ./strava_zones_backend/coverage.xml
           name: codecov-umbrella
