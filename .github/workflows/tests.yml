@@ -57,5 +57,5 @@ jobs:
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           slug: stancld/strava-zones
-          file: ./strava_zones_backend/coverage.xml
+          files: ./strava_zones_backend/coverage.xml
           name: codecov-umbrella
