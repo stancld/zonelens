@@ -14,7 +14,8 @@ from rest_framework import status
 from rest_framework.authtoken.models import Token
 from rest_framework.test import APITestCase
 
-from api.models import CustomZonesConfig, StravaUser, ZoneSummary
+from api.hr_processing import determine_hr_zone, parse_activity_streams
+from api.models import CustomZonesConfig, HeartRateZone, StravaUser, ZoneSummary
 from api.strava_client import (
 	STRAVA_API_ACTIVITIES_URL,
 	STRAVA_API_MAX_PER_PAGE,
@@ -543,3 +544,218 @@ class StravaClientFunctionTests(TestCase):
 			access_token="test_valid_access_token",  # This should be the decrypted token
 			params=expected_params,
 		)
+
+
+class HRProcessingTests(APITestCase):
+	def setUp(self) -> None:
+		"""Set up common test data."""
+		# First, create a standard Django User
+		django_user = get_user_model().objects.create_user(
+			username="hr_test_django_user", password="password"
+		)
+		# Then, create a StravaUser linked to the Django User
+		self.strava_user = StravaUser.objects.create(
+			user=django_user,
+			strava_id=998877,  # Example Strava ID
+			_access_token=encrypt_data("dummy_access_token_hr"),
+			_refresh_token=encrypt_data("dummy_refresh_token_hr"),
+			token_expires_at=timezone.now() + timezone.timedelta(hours=1),
+			scope="read,activity:read_all",
+		)
+
+		# CustomZonesConfig requires a StravaUser instance
+		self.default_zones_data = {
+			"Zone 1": [0, 100],
+			"Zone 2": [101, 120],
+			"Zone 3": [121, 140],
+			"Zone 4": [141, 160],
+			"Zone 5": [161, 200],
+		}
+		# Create the CustomZonesConfig instance first
+		self.zones_config = CustomZonesConfig.objects.create(
+			user=self.strava_user,  # Use the StravaUser instance here
+			activity_type="Ride",
+		)
+		# Then create and associate HeartRateZone objects
+		for i, (name, hr_range) in enumerate(self.default_zones_data.items()):
+			HeartRateZone.objects.create(
+				config=self.zones_config,
+				name=name,
+				min_hr=hr_range[0],
+				max_hr=hr_range[1],
+				order=i + 1,
+			)
+
+	def test_parse_activity_streams_success(self):
+		streams_data = {
+			"time": {"data": [0, 1, 2, 3], "original_size": 4, "resolution": "high"},
+			"heartrate": {"data": [120, 122, 125, 128], "original_size": 4, "resolution": "high"},
+		}
+		time_data, hr_data = parse_activity_streams(streams_data)
+		self.assertEqual(time_data, [0, 1, 2, 3])
+		self.assertEqual(hr_data, [120, 122, 125, 128])
+
+	def test_parse_activity_streams_missing_time(self):
+		streams_data = {"heartrate": {"data": [120, 122, 125, 128], "original_size": 4}}
+		time_data, hr_data = parse_activity_streams(streams_data)
+		self.assertIsNone(time_data)
+		self.assertEqual(hr_data, [120, 122, 125, 128])
+
+	def test_parse_activity_streams_missing_heartrate(self):
+		streams_data = {"time": {"data": [0, 1, 2, 3], "original_size": 4}}
+		time_data, hr_data = parse_activity_streams(streams_data)
+		self.assertEqual(time_data, [0, 1, 2, 3])
+		self.assertIsNone(hr_data)
+
+	def test_parse_activity_streams_empty_data_list(self):
+		streams_data = {
+			"time": {"data": [], "original_size": 0},
+			"heartrate": {"data": [120], "original_size": 1},
+		}
+		time_data, hr_data = parse_activity_streams(streams_data)
+		self.assertIsNone(time_data)  # Empty list treated as invalid/None
+		self.assertEqual(hr_data, [120])
+
+		streams_data_hr_empty = {
+			"time": {"data": [0, 1], "original_size": 2},
+			"heartrate": {"data": [], "original_size": 0},
+		}
+		time_data, hr_data = parse_activity_streams(streams_data_hr_empty)
+		self.assertEqual(time_data, [0, 1])
+		self.assertIsNone(hr_data)
+
+	def test_parse_activity_streams_non_integer_data(self):
+		streams_data = {
+			"time": {"data": [0, 1, "a", 3], "original_size": 4},
+			"heartrate": {"data": [120, 122, 125, 128], "original_size": 4},
+		}
+		time_data, hr_data = parse_activity_streams(streams_data)
+		self.assertIsNone(time_data)
+		self.assertEqual(hr_data, [120, 122, 125, 128])
+
+	def test_parse_activity_streams_mismatched_lengths(self):
+		# Should still parse but log a warning (tested manually)
+		streams_data = {
+			"time": {"data": [0, 1, 2], "original_size": 3},
+			"heartrate": {"data": [120, 122, 125, 128], "original_size": 4},
+		}
+		with self.assertLogs(level="WARNING") as log:
+			time_data, hr_data = parse_activity_streams(streams_data)
+			self.assertEqual(time_data, [0, 1, 2])
+			self.assertEqual(hr_data, [120, 122, 125, 128])
+			self.assertTrue(any("different lengths" in str(message) for message in log.output))
+
+	def test_parse_activity_streams_none_or_empty_input(self):
+		time_data, hr_data = parse_activity_streams(None)
+		self.assertIsNone(time_data)
+		self.assertIsNone(hr_data)
+
+		time_data, hr_data = parse_activity_streams({})
+		self.assertIsNone(time_data)
+		self.assertIsNone(hr_data)
+
+	# Tests for determine_hr_zone
+	def test_determine_hr_zone_exact_match(self):
+		self.assertEqual(determine_hr_zone(110, self.zones_config), "Zone 2")
+
+	def test_determine_hr_zone_lower_boundary(self):
+		self.assertEqual(determine_hr_zone(121, self.zones_config), "Zone 3")
+
+	def test_determine_hr_zone_upper_boundary(self):
+		self.assertEqual(determine_hr_zone(140, self.zones_config), "Zone 3")
+
+	def test_determine_hr_zone_below_lowest(self):
+		# Create config where lowest zone does not start at 0
+		zones_data_gapped = {"Zone 1": [50, 100], "Zone 2": [101, 120]}
+		gapped_config = CustomZonesConfig.objects.create(
+			user=self.strava_user, activity_type="TestGapped"
+		)
+		for i, (name, hr_range) in enumerate(zones_data_gapped.items()):
+			HeartRateZone.objects.create(
+				config=gapped_config,
+				name=name,
+				min_hr=hr_range[0],
+				max_hr=hr_range[1],
+				order=i + 1,
+			)
+		self.assertIsNone(determine_hr_zone(40, gapped_config))
+		self.assertIsNone(determine_hr_zone(-10, gapped_config))  # Test negative HR
+		self.assertEqual(
+			determine_hr_zone(0, self.zones_config), "Zone 1"
+		)  # Original config starts at 0
+
+	def test_determine_hr_zone_above_highest(self):
+		self.assertIsNone(determine_hr_zone(210, self.zones_config))
+
+	def test_determine_hr_zone_between_zones(self):
+		# With default config, there are no gaps. Test with a gapped config.
+		zones_data_gapped = {"Zone 1": [80, 100], "Zone 3": [121, 140]}
+		gapped_config = CustomZonesConfig.objects.create(
+			user=self.strava_user, activity_type="TestAboveGapped"
+		)
+		for i, (name, hr_range) in enumerate(zones_data_gapped.items()):
+			HeartRateZone.objects.create(
+				config=gapped_config,
+				name=name,
+				min_hr=hr_range[0],
+				max_hr=hr_range[1],
+				order=i + 1,
+			)
+		self.assertIsNone(determine_hr_zone(110, gapped_config))
+
+	def test_determine_hr_zone_empty_zones_dict(self):
+		# This test now means creating a config with NO HeartRateZone objects
+		empty_zones_config = CustomZonesConfig.objects.create(
+			user=self.strava_user, activity_type="Empty"
+		)
+		self.assertIsNone(determine_hr_zone(130, empty_zones_config))
+
+	def test_determine_hr_zone_malformed_zone_data(self):
+		# This test will check how determine_hr_zone handles malformed HeartRateZone objects
+		# that might exist in the DB, even if the model's clean() method prevents new ones.
+		malformed_config = CustomZonesConfig.objects.create(
+			user=self.strava_user, activity_type="Malformed"
+		)
+
+		HeartRateZone.objects.create(
+			config=malformed_config, name="Good Zone", min_hr=60, max_hr=90, order=1
+		)
+		HeartRateZone.objects.create(
+			config=malformed_config, name="Bad MinMax", min_hr=150, max_hr=140, order=2
+		)
+
+		# Test with an HR that would fall into the 'Bad MinMax' if it were valid
+		# but should be skipped due to min_hr > max_hr check in determine_hr_zone
+		self.assertIsNone(determine_hr_zone(145, malformed_config))
+
+		# Test that the good zone is still found
+		self.assertEqual(determine_hr_zone(70, malformed_config), "Good Zone")
+
+	def test_determine_hr_zone_unsorted_zones(self):
+		unsorted_zones_data = {
+			"Zone 5": [161, 180],
+			"Zone 1": [0, 100],
+			"Zone 3": [121, 140],
+			"Zone 4": [141, 160],
+			"Zone 2": [101, 120],
+		}
+		unsorted_config = CustomZonesConfig.objects.create(
+			user=self.strava_user, activity_type="Unsorted"
+		)
+		for i, (name, hr_range) in enumerate(unsorted_zones_data.items()):
+			HeartRateZone.objects.create(
+				config=unsorted_config,
+				name=name,
+				min_hr=hr_range[0],
+				max_hr=hr_range[1],
+				order=i + 1,
+			)
+
+		self.assertEqual(determine_hr_zone(110, unsorted_config), "Zone 2")
+		self.assertEqual(determine_hr_zone(170, unsorted_config), "Zone 5")
+		self.assertEqual(determine_hr_zone(50, unsorted_config), "Zone 1")
+
+
+class GPXParsingTests(TestCase):
+	# Add your tests here
+	pass

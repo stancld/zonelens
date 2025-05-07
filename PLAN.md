@@ -38,8 +38,8 @@ This file outlines the development steps and serves as a checklist to track prog
     - [x] Create utility/service function to fetch activities for a user/period (`GET /athlete/activities`).
     - [x] Create utility/service function to fetch HR stream for an activity (`GET /activities/{id}/streams?keys=heartrate,time`).
 - [ ] **HR Stream Processing**
-    - [ ] Implement logic to parse HR stream data.
-    - [ ] Implement logic to determine the custom zone for a given HR value based on user settings and activity type.
+    - [x] Implement logic to parse HR stream data.
+    - [x] Implement logic to determine the custom zone for a given HR value based on user settings and activity type.
     - [ ] Implement logic to calculate total time spent in each custom zone for a single activity.
 - [ ] **Data Aggregation & Storage**
     - [ ] Create a mechanism (e.g., Django management command `process_activities`) to:
