@@ -14,7 +14,12 @@ from rest_framework import status
 from rest_framework.authtoken.models import Token
 from rest_framework.test import APITestCase
 
-from api.hr_processing import determine_hr_zone, parse_activity_streams
+from api.hr_processing import (
+	OUTSIDE_ZONES_KEY,
+	calculate_time_in_zones,
+	determine_hr_zone,
+	parse_activity_streams,
+)
 from api.models import CustomZonesConfig, HeartRateZone, StravaUser, ZoneSummary
 from api.strava_client import (
 	STRAVA_API_ACTIVITIES_URL,
@@ -754,6 +759,148 @@ class HRProcessingTests(APITestCase):
 		self.assertEqual(determine_hr_zone(110, unsorted_config), "Zone 2")
 		self.assertEqual(determine_hr_zone(170, unsorted_config), "Zone 5")
 		self.assertEqual(determine_hr_zone(50, unsorted_config), "Zone 1")
+
+	# --- Tests for calculate_time_in_zones ---
+	def test_calculate_time_in_zones_basic(self):
+		# time_data:  [  0,  10,  20,  30,  40,  50,  60,  70]
+		# hr_data:    [ 90, 110, 130, 150, 170,  50, 135, 200] # HR at start of segment
+		# duration:      10,  10,  10,  10,  10,  10,  10
+		# zone for HR: Z1,  Z2,  Z3,  Z4,  Z5, Out,  Z3, Out
+		time_data = [0, 10, 20, 30, 40, 50, 60, 70]
+		heartrate_data = [90, 110, 130, 150, 170, 50, 135, 200]
+		# heartrate_data is for HR at the start of the segment, so one less element than time_data
+		# For calculate_time_in_zones, we expect len(time_data) == len(heartrate_data) usually,
+		# where heartrate_data[i] is the HR for the segment time_data[i] to time_data[i+1].
+		# Let's adjust to match typical Strava stream structure where len(time) == len(hr)
+		heartrate_data = [
+			90,
+			110,
+			130,
+			150,
+			170,
+			50,
+			135,
+			200,
+		]  # Last HR won't start a new segment
+
+		# Expected distribution based on self.default_zones_data for self.zones_config:
+		# Z1 (0-100):   90 (10s)
+		# Z2 (101-120): 110 (10s)
+		# Z3 (121-140): 130 (10s), 135 (10s) = 20s
+		# Z4 (141-160): 150 (10s)
+		# Z5 (161-200): 170 (10s)
+		# Outside:      50 (10s) (HR 200 is for the last data point, not a segment start)
+
+		# The function uses heartrate_data[i] for the segment time_data[i] to time_data[i+1]
+		# So, for 7 segments:
+		# Segment 0 (0-10s), HR 90 (Z1) -> Z1: 10s
+		# Segment 1 (10-20s), HR 110 (Z2) -> Z2: 10s
+		# Segment 2 (20-30s), HR 130 (Z3) -> Z3: 10s
+		# Segment 3 (30-40s), HR 150 (Z4) -> Z4: 10s
+		# Segment 4 (40-50s), HR 170 (Z5) -> Z5: 10s
+		# Segment 5 (50-60s), HR 50 (Z1, as 0-100) -> Z1: 10s + 10s = 20s
+		# Segment 6 (60-70s), HR 135 (Z3) -> Z3: 10s + 10s = 20s
+		result = calculate_time_in_zones(time_data, heartrate_data, self.zones_config)
+		expected = {
+			"Zone 1": 20,  # 90 for 10s, 50 for 10s
+			"Zone 2": 10,
+			"Zone 3": 20,  # 130 for 10s, 135 for 10s
+			"Zone 4": 10,
+			"Zone 5": 10,
+			OUTSIDE_ZONES_KEY: 0,
+		}
+		self.assertDictEqual(result, expected)
+
+	def test_calculate_time_in_zones_empty_inputs(self):
+		base_expected = {OUTSIDE_ZONES_KEY: 0}
+		for zn_model in self.zones_config.zones_definition.all():
+			base_expected[zn_model.name] = 0
+
+		self.assertDictEqual(
+			calculate_time_in_zones(None, [100, 120], self.zones_config), base_expected
+		)
+		self.assertDictEqual(
+			calculate_time_in_zones([0, 10], None, self.zones_config), base_expected
+		)
+		self.assertDictEqual(
+			calculate_time_in_zones([], [100, 120], self.zones_config), base_expected
+		)
+		self.assertDictEqual(
+			calculate_time_in_zones([0, 10], [], self.zones_config), base_expected
+		)
+
+	def test_calculate_time_in_zones_no_config_or_empty_zones(self):
+		time_data = [0, 10, 20]
+		heartrate_data = [100, 120, 130]
+		# Case 1: No zones_config provided
+		result_no_config = calculate_time_in_zones(time_data, heartrate_data, None)
+		# All time (10s + 10s = 20s) should be 'Outside Defined Zones'
+		self.assertDictEqual(result_no_config, {OUTSIDE_ZONES_KEY: 20})
+
+		# Case 2: zones_config exists but has no HeartRateZone objects
+		empty_zones_config = CustomZonesConfig.objects.create(
+			user=self.strava_user, activity_type="TestEmptyZonesCalc"
+		)
+		result_empty_zones = calculate_time_in_zones(time_data, heartrate_data, empty_zones_config)
+		self.assertDictEqual(result_empty_zones, {OUTSIDE_ZONES_KEY: 20})
+
+	def test_calculate_time_in_zones_mismatched_lengths(self):
+		time_data = [0, 10, 20]
+		heartrate_data = [100, 120]  # Length mismatch
+		base_expected = {OUTSIDE_ZONES_KEY: 0}
+		for zn_model in self.zones_config.zones_definition.all():
+			base_expected[zn_model.name] = 0
+		self.assertDictEqual(
+			calculate_time_in_zones(time_data, heartrate_data, self.zones_config), base_expected
+		)
+
+	def test_calculate_time_in_zones_insufficient_data(self):
+		base_expected = {OUTSIDE_ZONES_KEY: 0}
+		for zn_model in self.zones_config.zones_definition.all():
+			base_expected[zn_model.name] = 0
+
+		self.assertDictEqual(calculate_time_in_zones([0], [100], self.zones_config), base_expected)
+		self.assertDictEqual(calculate_time_in_zones([], [], self.zones_config), base_expected)
+
+	def test_calculate_time_in_zones_all_outside(self):
+		# HR values are consistently below Zone 1 (which starts at 0 for default_zones_data)
+		# or above Zone 5 (which ends at 200 for default_zones_data)
+		time_data = [0, 10, 20, 30]  # Adjusted for 3 segments, 30s total
+		heartrate_data_low = [-10, -5, -20, -15]  # Last element is dummy for length matching
+		heartrate_data_high = [210, 220, 205, 215]  # Last element is dummy
+
+		# Create a config where Zone 1 starts higher to make 'below' more distinct
+		gapped_config = CustomZonesConfig.objects.create(
+			user=self.strava_user, activity_type="GappedBelow"
+		)
+		HeartRateZone.objects.create(
+			config=gapped_config, name="ZTest", min_hr=50, max_hr=100, order=1
+		)
+
+		result_low_gapped = calculate_time_in_zones(time_data, heartrate_data_low, gapped_config)
+		# All time (10s * 3 segments = 30s) should be 'Outside Defined Zones'
+		self.assertDictEqual(result_low_gapped, {"ZTest": 0, OUTSIDE_ZONES_KEY: 30})
+
+		result_high_default = calculate_time_in_zones(
+			time_data, heartrate_data_high, self.zones_config
+		)
+		expected_default_all_outside = {OUTSIDE_ZONES_KEY: 30}
+		for zn_model in self.zones_config.zones_definition.all():
+			expected_default_all_outside[zn_model.name] = 0
+		self.assertDictEqual(result_high_default, expected_default_all_outside)
+
+	def test_calculate_time_in_zones_negative_duration(self):
+		time_data = [0, 20, 10]  # Unsorted time, results in negative duration for second segment
+		heartrate_data = [100, 120, 130]
+		# Segment 1 (0-20s), HR 100 (Z1) -> Z1: 20s
+		# Segment 2 (20-10s), HR 120 -> Negative duration, skipped.
+		result = calculate_time_in_zones(time_data, heartrate_data, self.zones_config)
+
+		expected = {OUTSIDE_ZONES_KEY: 0}
+		for zn_model in self.zones_config.zones_definition.all():
+			expected[zn_model.name] = 0
+		expected["Zone 1"] = 20  # Only the first segment should be counted
+		self.assertDictEqual(result, expected)
 
 
 class GPXParsingTests(TestCase):

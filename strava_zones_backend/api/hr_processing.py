@@ -124,3 +124,83 @@ def determine_hr_zone(hr_value: int, zones_config: CustomZonesConfig) -> str | N
 	)
 	logger.debug(debug_msg)
 	return None  # HR value is outside all defined zones
+
+
+OUTSIDE_ZONES_KEY = "Time Outside Defined Zones"
+
+
+def calculate_time_in_zones(
+	time_data: list[int] | None,
+	heartrate_data: list[int] | None,
+	zones_config: CustomZonesConfig | None,
+) -> dict[str, int]:
+	"""
+	Calculates the total time spent in each custom heart rate zone for an activity.
+
+	Parameters
+	----------
+	time_data
+	    A list of integers representing the time series in seconds (sorted).
+	heartrate_data
+	    A list of integers representing the heart rate series in bpm.
+	zones_config
+	    The CustomZonesConfig object containing the zone definitions.
+
+	Returns
+	-------
+	    A dictionary where keys are zone names (str) and values are total time
+	    spent in that zone in seconds (int). Includes a key for time spent
+	    outside any defined zones.
+	"""
+	time_spent_in_zones: dict[str, int] = {OUTSIDE_ZONES_KEY: 0}
+
+	if not zones_config:
+		logger.warning(
+			"calculate_time_in_zones called with no zones_config. Times will be 'outside zones'."
+		)
+		# If no zones_config, all time is technically 'outside' but we need durations.
+		# Fall through, determine_hr_zone will return None for all HRs.
+	else:
+		try:
+			for zone_model in zones_config.zones_definition.all():
+				time_spent_in_zones[zone_model.name] = 0
+		except Exception as e:  # Handle DB error if zones_definition can't be accessed
+			logger.error(
+				f"Error accessing zone definitions for config {zones_config.id}: {e}. "
+				"Proceeding as if no zones were defined."
+			)
+			# Reset to just OUTSIDE_ZONES_KEY if there was an error fetching actual zones
+			time_spent_in_zones = {OUTSIDE_ZONES_KEY: 0}
+
+	if not time_data or not heartrate_data:
+		logger.warning("Time or HR data is missing. Cannot calculate time in zones.")
+		return time_spent_in_zones  # Return initialized (mostly empty) dict
+
+	if len(time_data) != len(heartrate_data):
+		logger.warning(
+			"Time and HR data lists have different lengths. "
+			"Cannot accurately calculate time in zones."
+		)
+		return time_spent_in_zones  # Return initialized dict
+
+	if len(time_data) < 2:
+		logger.info("Insufficient data points (need at least 2) to calculate time in zones.")
+		return time_spent_in_zones  # No durations to calculate
+
+	for i in range(len(time_data) - 1):
+		hr_value = heartrate_data[i]
+		duration_seconds = time_data[i + 1] - time_data[i]
+
+		if duration_seconds <= 0:
+			continue
+
+		zone_name = determine_hr_zone(hr_value, zones_config)  # type: ignore[arg-type]
+
+		if zone_name:
+			time_spent_in_zones[zone_name] = (
+				time_spent_in_zones.get(zone_name, 0) + duration_seconds
+			)
+		else:
+			time_spent_in_zones[OUTSIDE_ZONES_KEY] += duration_seconds
+
+	return time_spent_in_zones
