@@ -11,6 +11,7 @@
 - Manage credentials and secrets through environment variables only
 - Never generate components in advance – only implement features when explicitly requested
 - Complete and test each component fully before moving to the next
+- Do not proactively fix linting issues
 
 ## Python Conventions
 
