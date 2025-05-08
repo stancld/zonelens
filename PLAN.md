@@ -43,12 +43,11 @@ This file outlines the development steps and serves as a checklist to track prog
     - [x] Implement logic to calculate total time spent in each custom zone for a single activity.
 - [ ] **Data Aggregation & Storage**
     - [ ] Create a mechanism (e.g., Django management command `process_activities`) to:
-        - [ ] Iterate through users or process for a specific user.
-        *   [ ] Fetch activities for a given period.
-        *   [ ] For each activity, fetch HR stream.
-        *   [ ] Process stream against custom zones.
-        *   [ ] Aggregate results weekly and monthly.
-        *   [ ] Store aggregated results in `ZoneSummary` table (create or update).
+        - [ ] Fetch activities for a given period.
+        - [ ] For each activity, fetch HR stream.
+        - [ ] Process stream against custom zones.
+        - [ ] Aggregate results weekly and monthly.
+        - [ ] Store aggregated results in `ZoneSummary` table (create or update).
     - [ ] Consider background task queue (like Celery) for long-running processing (optional initial step).
 
 ## Phase 3: Backend API Endpoint

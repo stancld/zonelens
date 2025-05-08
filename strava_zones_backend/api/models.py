@@ -120,7 +120,7 @@ class HeartRateZone(models.Model):
 
 
 class ZoneSummary(models.Model):
-	"""Stores aggregated time-in-zone summaries."""
+	"""Stores aggregated time-in-zone summaries for specific periods."""
 
 	class PeriodType(models.TextChoices):
 		WEEKLY = "WEEKLY", "Weekly"
@@ -133,13 +133,50 @@ class ZoneSummary(models.Model):
 	period_index = models.PositiveIntegerField(help_text="Month (1-12) or Week (1-53)")
 	zone_times_seconds = models.JSONField(
 		default=dict,
-		help_text="JSON containing aggregated time in seconds for each zone name.",
+		help_text="JSON containing aggregated time in seconds for each zone name for the period.",
 	)
 	updated_at = models.DateTimeField(auto_now=True)
 
 	class Meta:
 		unique_together = ("user", "period_type", "year", "period_index")
 		indexes: ClassVar = [models.Index(fields=["user", "period_type", "year", "period_index"])]
+		verbose_name = "Periodic Zone Summary"
+		verbose_name_plural = "Periodic Zone Summaries"
 
 	def __str__(self) -> str:
 		return f"{self.get_period_type_display()} summary for {self.user.strava_id} - {self.year}/{self.period_index}"  # noqa: E501
+
+
+class ActivityZoneTimes(models.Model):
+	"""Stores time spent in each custom heart rate zone for a single activity."""
+
+	id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+	user = models.ForeignKey(
+		StravaUser, on_delete=models.CASCADE, related_name="activity_zone_times"
+	)
+	activity_id = models.BigIntegerField(help_text="Strava Activity ID", db_index=True)
+	zone_name = models.CharField(max_length=100, help_text="Custom name of the heart rate zone")
+	duration_seconds = models.PositiveIntegerField(
+		help_text="Time spent in this zone for this activity in seconds"
+	)
+	activity_date = models.DateTimeField(
+		help_text="Date and time the activity started", default=timezone.now
+	)  # Added for sorting/filtering
+	created_at = models.DateTimeField(auto_now_add=True)
+	updated_at = models.DateTimeField(auto_now=True)
+
+	class Meta:
+		unique_together = ("user", "activity_id", "zone_name")
+		ordering = ["-activity_date", "user", "zone_name"]
+		indexes: ClassVar = [
+			models.Index(fields=["user", "activity_id"]),
+			models.Index(fields=["user", "activity_date"]),
+		]
+		verbose_name = "Activity Zone Time"
+		verbose_name_plural = "Activity Zone Times"
+
+	def __str__(self) -> str:
+		return (
+			f"{self.user.strava_id} - "
+			f"Activity {self.activity_id}: {self.zone_name} ({self.duration_seconds}s)"
+		)
