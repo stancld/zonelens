@@ -26,8 +26,7 @@ from api.strava_client import (
 	STRAVA_API_MAX_PER_PAGE,
 	STRAVA_API_STREAMS_URL_TEMPLATE,
 	STRAVA_TOKEN_URL,
-	fetch_activity_streams,
-	fetch_all_strava_activities,
+	StravaApiClient,
 )
 from api.utils import decrypt_data, encrypt_data
 
@@ -346,7 +345,7 @@ class CustomZonesSettingsViewTests(APITestCase):
 		self.assertEqual(len(response.data[0]["zones_definition"]), 2)
 
 
-class StravaClientFunctionTests(TestCase):
+class StravaApiClientFunctionTests(TestCase):
 	def setUp(self) -> None:
 		"""Set up a user and StravaUser for testing client functions."""
 		self.django_user = get_user_model().objects.create_user(
@@ -362,6 +361,7 @@ class StravaClientFunctionTests(TestCase):
 		self.strava_user.access_token = "mock_valid_access_token"
 		self.strava_user.refresh_token = "mock_valid_refresh_token"
 		self.strava_user.save()
+		self.strava_client = StravaApiClient(self.strava_user)
 
 	@requests_mock.Mocker()
 	def test_fetch_all_acts_multiple_pages_no_refresh(self, mocker: requests_mock.Mocker) -> None:
@@ -388,7 +388,7 @@ class StravaClientFunctionTests(TestCase):
 		# Mock POST request for token refresh (we assert it's not called)
 		mocker.post(STRAVA_TOKEN_URL, status_code=200, json=MOCK_STRAVA_TOKEN_RESPONSE)
 
-		all_activities = fetch_all_strava_activities(self.strava_user)
+		all_activities = self.strava_client.fetch_all_strava_activities()
 
 		self.assertIsNotNone(all_activities)
 		self.assertEqual(len(all_activities), STRAVA_API_MAX_PER_PAGE + 10)  # type: ignore[arg-type]
@@ -427,12 +427,6 @@ class StravaClientFunctionTests(TestCase):
 	@requests_mock.Mocker()
 	def test_fetch_all_acts_token_refresh_success(self, mocker: requests_mock.Mocker) -> None:
 		"""Test fetching all activities with a successful token refresh mid-fetch."""
-		from api.strava_client import (
-			STRAVA_API_ACTIVITIES_URL,
-			STRAVA_API_MAX_PER_PAGE,
-			STRAVA_TOKEN_URL,
-			fetch_all_strava_activities,
-		)
 
 		# Simulate an expired token
 		self.strava_user.token_expires_at = timezone.now() - timezone.timedelta(hours=1)
@@ -473,7 +467,7 @@ class StravaClientFunctionTests(TestCase):
 			],
 		)
 
-		all_activities = fetch_all_strava_activities(self.strava_user)
+		all_activities = self.strava_client.fetch_all_strava_activities()
 
 		self.assertIsNotNone(all_activities)
 		self.assertEqual(len(all_activities), STRAVA_API_MAX_PER_PAGE + 10)  # type: ignore[arg-type]
@@ -515,7 +509,7 @@ class StravaClientFunctionTests(TestCase):
 		self.assertEqual(activity_calls[2].qs["page"], ["2"])
 		self.assertEqual(activity_calls[3].qs["page"], ["3"])
 
-	@patch("api.strava_client.StravaHttpRequestClient.get")
+	@patch("api.strava_client.StravaApiClient.get")
 	def test_fetch_activity_streams_success(self, mock_strava_get: MagicMock) -> None:
 		"""Test successfully fetching activity streams."""
 		activity_id = 1234567890
@@ -536,7 +530,7 @@ class StravaClientFunctionTests(TestCase):
 		self.strava_user._access_token = encrypt_data("test_valid_access_token")
 		self.strava_user.save()
 
-		streams = fetch_activity_streams(self.strava_user, activity_id)
+		streams = self.strava_client.fetch_activity_streams(activity_id)
 
 		self.assertIsNotNone(streams)
 		self.assertEqual(streams, mock_stream_data)
