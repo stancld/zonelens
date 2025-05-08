@@ -39,17 +39,17 @@ jobs:
           python-version: 3.12
       - name: Install dependencies
         run: |
-          cd strava_zones_backend
+          cd backend
           pip install -e '.[dev]' -c constraints.txt
         shell: bash
       - name: Run tests
         run: |
-          cd strava_zones_backend
+          cd backend
           coverage run --source='.' manage.py test api
       - name: Coverage statistics
         if: success()
         run: |
-          cd strava_zones_backend
+          cd backend
           coverage xml
           coverage report
       - name: Upload coverage to Codecov
@@ -57,5 +57,5 @@ jobs:
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           slug: stancld/strava-zones
-          files: ./strava_zones_backend/coverage.xml
+          files: ./backend/coverage.xml
           name: codecov-umbrella
