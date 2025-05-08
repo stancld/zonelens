@@ -1,12 +1,15 @@
 from __future__ import annotations
 
-import logging
 from typing import TYPE_CHECKING, Any
+
+from api.logging import get_logger
 
 if TYPE_CHECKING:
 	from api.models import CustomZonesConfig
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
+
+OUTSIDE_ZONES_KEY = "Time Outside Defined Zones"
 
 
 def parse_activity_streams(
@@ -124,9 +127,6 @@ def determine_hr_zone(hr_value: int, zones_config: CustomZonesConfig) -> str | N
 	)
 	logger.debug(debug_msg)
 	return None  # HR value is outside all defined zones
-
-
-OUTSIDE_ZONES_KEY = "Time Outside Defined Zones"
 
 
 def calculate_time_in_zones(

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import unittest.mock
 from datetime import datetime
 from unittest.mock import MagicMock, patch
 from urllib.parse import urlparse
@@ -20,7 +21,14 @@ from api.hr_processing import (
 	determine_hr_zone,
 	parse_activity_streams,
 )
-from api.models import CustomZonesConfig, HeartRateZone, StravaUser, ZoneSummary
+from api.models import (
+	ActivityType,
+	ActivityZoneTimes,
+	CustomZonesConfig,
+	HeartRateZone,
+	StravaUser,
+	ZoneSummary,
+)
 from api.strava_client import (
 	STRAVA_API_ACTIVITIES_URL,
 	STRAVA_API_MAX_PER_PAGE,
@@ -29,6 +37,7 @@ from api.strava_client import (
 	StravaApiClient,
 )
 from api.utils import decrypt_data, encrypt_data
+from api.worker import StravaHRWorker
 
 
 class InitialMigrationTests(TestCase):
@@ -36,9 +45,9 @@ class InitialMigrationTests(TestCase):
 	def user(self) -> StravaUser:
 		return StravaUser.objects.create(
 			strava_id=12345,
-			_access_token="dummy_encrypted_token",  # Assuming encrypt_data handles string->bytes
+			_access_token="dummy_encrypted_token",
 			_refresh_token="dummy_encrypted_refresh",
-			token_expires_at=datetime.now(),  # Use correct field name
+			token_expires_at=datetime.now(),
 			scope="read,activity:read_all",
 		)
 
@@ -55,11 +64,10 @@ class InitialMigrationTests(TestCase):
 
 	def test_zone_config_can_be_created(self) -> None:
 		zone_config = CustomZonesConfig.objects.create(
-			user=self.user,
-			activity_type=CustomZonesConfig.ActivityType.RUN,
+			user=self.user, activity_type=ActivityType.RUN
 		)
 		self.assertIsNotNone(zone_config.pk)
-		self.assertEqual(zone_config.activity_type, CustomZonesConfig.ActivityType.RUN)
+		self.assertEqual(zone_config.activity_type, ActivityType.RUN)
 
 	def test_summary_can_be_created(self) -> None:
 		zone_summary = ZoneSummary.objects.create(
@@ -286,7 +294,7 @@ class CustomZonesSettingsViewTests(APITestCase):
 		)
 		self.token = Token.objects.create(user=self.django_user)
 		self.client.credentials(HTTP_AUTHORIZATION=f"Token {self.token.key}")
-		self.url = reverse("zone_settings_list_create")
+		self.url = reverse("custom_zones_settings")
 		self.sample_payload = {
 			"activity_type": "RUN",
 			"zones_definition": [
@@ -345,6 +353,7 @@ class CustomZonesSettingsViewTests(APITestCase):
 		self.assertEqual(len(response.data[0]["zones_definition"]), 2)
 
 
+@unittest.mock.patch("api.strava_client.decrypt_data", lambda secret: secret)
 class StravaApiClientFunctionTests(TestCase):
 	def setUp(self) -> None:
 		"""Set up a user and StravaUser for testing client functions."""
@@ -897,6 +906,201 @@ class HRProcessingTests(APITestCase):
 		self.assertDictEqual(result, expected)
 
 
-class GPXParsingTests(TestCase):
-	# Add your tests here
-	pass
+class StravaHRWorkerTests(TestCase):
+	def setUp(self) -> None:
+		self.django_user = get_user_model().objects.create_user(
+			username="testuser_zones", password="password123"
+		)
+		self.strava_user = StravaUser.objects.create(
+			user=self.django_user,
+			strava_id=112233,
+			_access_token=encrypt_data("dummy_access"),
+			_refresh_token=encrypt_data("dummy_refresh"),
+			token_expires_at=timezone.now() + timezone.timedelta(hours=1),
+			scope="read,activity:read_all",
+		)
+		self.token = Token.objects.create(user=self.django_user)
+
+	@patch("api.worker.StravaApiClient", autospec=True)
+	def test_process_user_activities_no_config(self, MockStravaApiClient: MagicMock) -> None:
+		"""Test process_user_activities raises ValueError if no default config."""
+		# Ensure no default config for the user
+		CustomZonesConfig.objects.filter(
+			user=self.strava_user, activity_type=ActivityType.DEFAULT
+		).delete()
+		worker = StravaHRWorker(user_strava_id=self.strava_user.strava_id)
+		with self.assertRaisesRegex(
+			ValueError, f"Zones config not found for user {self.strava_user.strava_id}."
+		):
+			worker.process_user_activities()
+
+	@patch("api.worker.calculate_time_in_zones")
+	@patch("api.worker.parse_activity_streams")
+	@patch("api.worker.StravaApiClient", autospec=True)
+	def test_process_user_activities_success(
+		self,
+		MockStravaApiClient: MagicMock,
+		mock_parse_streams: MagicMock,
+		mock_calc_zones: MagicMock,
+	) -> None:
+		"""Test successful processing of activities with heart rate."""
+		# Setup default config
+		config = CustomZonesConfig.objects.create(
+			user=self.strava_user, activity_type=ActivityType.DEFAULT
+		)
+		HeartRateZone.objects.create(config=config, name="Z1", min_hr=0, max_hr=120, order=1)
+		HeartRateZone.objects.create(config=config, name="Z2", min_hr=121, max_hr=150, order=2)
+
+		mock_client_instance = MockStravaApiClient.return_value
+		mock_activities_summary = [
+			{
+				"id": "123",
+				"start_date": "2024-01-01T10:00:00Z",
+				"has_heartrate": True,
+				"type": "Run",
+			},
+			{
+				"id": "456",
+				"start_date": "2024-01-02T10:00:00Z",
+				"has_heartrate": False,
+				"type": "Ride",
+			},  # No HR
+			{
+				"id": "789",
+				"start_date": "2024-01-03T10:00:00Z",
+				"has_heartrate": True,
+				"type": "Run",
+			},
+		]
+		mock_client_instance.fetch_strava_activities.return_value = mock_activities_summary
+
+		# Mock stream data for activity 123
+		mock_client_instance.fetch_activity_streams.side_effect = (
+			lambda activity_id, **kwargs: {
+				"heartrate": {"data": [100, 110, 130], "original_size": 3},
+				"time": {"data": [0, 10, 20], "original_size": 3},
+			}
+			if str(activity_id) == "123"
+			else {
+				"heartrate": {"data": [140, 145], "original_size": 2},
+				"time": {"data": [0, 5], "original_size": 2},
+			}
+			if str(activity_id) == "789"
+			else None
+		)
+
+		# Mock parse_activity_streams
+		mock_parse_streams.side_effect = (
+			lambda streams: ([0, 10, 20], [100, 110, 130])
+			if streams and streams.get("heartrate", {}).get("data") == [100, 110, 130]
+			else ([0, 5], [140, 145])
+			if streams and streams.get("heartrate", {}).get("data") == [140, 145]
+			else ([], [])
+		)
+
+		# Mock calculate_time_in_zones
+		mock_calc_zones.side_effect = (
+			lambda time_data, hr_data, zones_cfg: {"Z1": 20, "Z2": 10, OUTSIDE_ZONES_KEY: 5}
+			if hr_data == [100, 110, 130]
+			else {"Z2": 5, OUTSIDE_ZONES_KEY: 0}
+			if hr_data == [140, 145]
+			else {}
+		)
+
+		worker = StravaHRWorker(user_strava_id=self.strava_user.strava_id)
+		with self.assertLogs(worker.logger, level="INFO") as cm:
+			worker.process_user_activities()
+
+		self.assertEqual(
+			ActivityZoneTimes.objects.count(), 3
+		)  # 2 zones for act 123, 1 for act 789
+		self.assertTrue(
+			ActivityZoneTimes.objects.filter(
+				activity_id=123, zone_name="Z1", duration_seconds=20
+			).exists()
+		)
+		self.assertTrue(
+			ActivityZoneTimes.objects.filter(
+				activity_id=123, zone_name="Z2", duration_seconds=10
+			).exists()
+		)
+		self.assertTrue(
+			ActivityZoneTimes.objects.filter(
+				activity_id=789, zone_name="Z2", duration_seconds=5
+			).exists()
+		)
+		mock_client_instance.fetch_strava_activities.assert_called_once_with(after=None)
+		self.assertEqual(
+			mock_client_instance.fetch_activity_streams.call_count, 2
+		)  # Called for 123 and 789
+		self.assertTrue(any("No new activities found" not in log_msg for log_msg in cm.output))
+		self.assertTrue(
+			any(
+				"Activity 456 for user 112233" in log_msg and "no heart rate data" in log_msg
+				for log_msg in cm.output
+			)
+		)
+		self.assertTrue(
+			any(
+				"There is 5 s outside any zone for activity 123." in log_msg
+				for log_msg in cm.output
+			)
+		)
+
+	@patch("api.worker.StravaApiClient", autospec=True)
+	def test_process_user_activities_no_new_activities(
+		self, MockStravaApiClient: MagicMock
+	) -> None:
+		"""Test process_user_activities logs info when no new activities are found."""
+		CustomZonesConfig.objects.create(user=self.strava_user, activity_type=ActivityType.DEFAULT)
+		mock_client_instance = MockStravaApiClient.return_value
+		mock_client_instance.fetch_strava_activities.return_value = []  # No activities
+
+		worker = StravaHRWorker(user_strava_id=self.strava_user.strava_id)
+		worker.process_user_activities()
+		self.assertEqual(ActivityZoneTimes.objects.count(), 0)
+
+	@patch("api.worker.StravaApiClient", autospec=True)
+	def test_process_user_activities_fetch_activities_fails(
+		self, MockStravaApiClient: MagicMock
+	) -> None:
+		"""Test handling StravaApiClient failure during fetch_strava_activities."""
+		CustomZonesConfig.objects.create(user=self.strava_user, activity_type=ActivityType.DEFAULT)
+		mock_client_instance = MockStravaApiClient.return_value
+		mock_client_instance.fetch_strava_activities.side_effect = ValueError("API fetch error")
+
+		worker = StravaHRWorker(user_strava_id=self.strava_user.strava_id)
+		with self.assertRaisesRegex(
+			ValueError, f"Failed to fetch activities for user {self.strava_user.strava_id}"
+		):
+			worker.process_user_activities()
+
+	@patch("api.worker.StravaApiClient", autospec=True)
+	def test_process_user_activities_fetch_streams_fails(
+		self, MockStravaApiClient: MagicMock
+	) -> None:
+		"""Test handling StravaApiClient failure during fetch_activity_streams."""
+		CustomZonesConfig.objects.create(user=self.strava_user, activity_type=ActivityType.DEFAULT)
+		mock_client_instance = MockStravaApiClient.return_value
+		mock_client_instance.fetch_strava_activities.return_value = [
+			{
+				"id": "123",
+				"start_date": "2024-01-01T10:00:00Z",
+				"has_heartrate": True,
+				"type": "Run",
+			}
+		]
+		mock_client_instance.fetch_activity_streams.side_effect = ValueError("Stream fetch error")
+
+		worker = StravaHRWorker(user_strava_id=self.strava_user.strava_id)
+		with self.assertLogs(worker.logger, level="ERROR") as cm:
+			worker.process_user_activities()
+
+		err_msg = (
+			"Failed to fetch or parse streams for activity 123 "
+			f"(user {self.strava_user.strava_id}): Stream fetch error"
+		)
+		self.assertTrue(any(err_msg in log_msg for log_msg in cm.output))
+		self.assertEqual(
+			ActivityZoneTimes.objects.count(), 0
+		)  # No zones should be saved if streams fail

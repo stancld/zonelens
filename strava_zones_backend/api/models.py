@@ -1,17 +1,17 @@
 from __future__ import annotations
 
-import logging
 import uuid
 from typing import ClassVar
 
 from django.conf import settings
-from django.core.exceptions import ValidationError  # For model clean method
+from django.core.exceptions import ValidationError
 from django.db import models
 from django.utils import timezone
 
+from api.logging import get_logger
 from api.utils import decrypt_data, encrypt_data
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class StravaUser(models.Model):
@@ -68,13 +68,14 @@ class StravaUser(models.Model):
 		self._refresh_token = encrypt_data(value)
 
 
+class ActivityType(models.TextChoices):
+	DEFAULT = "DEFAULT", "Default"
+	RUN = "RUN", "Run"
+	RIDE = "RIDE", "Ride"
+
+
 class CustomZonesConfig(models.Model):
 	"""Configuration grouping for a user's HR zones for a specific activity type."""
-
-	class ActivityType(models.TextChoices):
-		DEFAULT = "DEFAULT", "Default"
-		RUN = "RUN", "Run"
-		RIDE = "RIDE", "Ride"
 
 	id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
 	user = models.ForeignKey(StravaUser, on_delete=models.CASCADE, related_name="zone_configs")

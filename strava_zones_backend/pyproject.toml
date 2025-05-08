@@ -89,7 +89,10 @@ ignore = [
     "W191",  # Indentation contains tabs
 ]
 
-[tool.rufflint.flake8-tidy-imports]
+[tool.ruff.lint.per-file-ignores]
+"api/tests.py" = ["ARG"]
+
+[tool.ruff.lint.flake8-tidy-imports]
 # Disallow all relative imports.
 ban-relative-imports = "all"
 
@@ -98,9 +101,6 @@ required-imports = ["from __future__ import annotations"]
 
 [tool.ruff.lint.pydocstyle]
 convention = "numpy"
-
-[tool.ruff.lint.per-file-ignores]
-"tests/**" = ["ERA001", "PL"]
 
 [tool.ruff.lint.pylint]
 max-returns = 10

@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING
 
 from rest_framework import serializers
 
-from api.models import CustomZonesConfig, HeartRateZone
+from api.models import ActivityType, CustomZonesConfig, HeartRateZone
 
 if TYPE_CHECKING:
 	from typing import Any
@@ -20,9 +20,7 @@ class HeartRateZoneSerializer(serializers.ModelSerializer):
 class CustomZonesConfigSerializer(serializers.ModelSerializer):
 	zones_definition = HeartRateZoneSerializer(many=True)
 	user = serializers.PrimaryKeyRelatedField(read_only=True)
-	activity_type = serializers.ChoiceField(
-		choices=CustomZonesConfig.ActivityType.choices, required=True
-	)
+	activity_type = serializers.ChoiceField(choices=ActivityType.choices, required=True)
 
 	class Meta:
 		model = CustomZonesConfig

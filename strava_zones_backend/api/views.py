@@ -10,16 +10,18 @@ from django.contrib.auth import get_user_model
 from django.http import HttpRequest, HttpResponse, HttpResponseBadRequest, HttpResponseRedirect
 from django.shortcuts import render
 from django.utils import timezone
-from rest_framework import generics
+from rest_framework import generics, status
 from rest_framework.authentication import TokenAuthentication
 from rest_framework.authtoken.models import Token
 from rest_framework.decorators import api_view, authentication_classes, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
+from rest_framework.views import APIView
 
 from api.models import CustomZonesConfig, StravaUser
 from api.serializers import CustomZonesConfigSerializer
 from api.utils import encrypt_data
+from api.worker import StravaHRWorker
 
 if TYPE_CHECKING:
 	from typing import TypedDict
@@ -36,7 +38,9 @@ if TYPE_CHECKING:
 		grant_type: str
 
 
-User = get_user_model()  # Get the active user model
+logger = logging.getLogger(__name__)
+
+User = get_user_model()
 
 STRAVA_AUTH_URL = "https://www.strava.com/oauth/authorize"
 STRAVA_TOKEN_URL = "https://www.strava.com/oauth/token"
@@ -78,7 +82,7 @@ def strava_callback(request: HttpRequest) -> HttpResponse:
 		strava_id = athlete_info.get("id")
 
 		if not strava_id:
-			logging.error("Strava ID not found in token response.")
+			logger.error("Strava ID not found in token response.")
 			return HttpResponseBadRequest("Could not retrieve Strava user ID.")
 
 		user = _get_user(
@@ -179,3 +183,41 @@ class CustomZonesSettingsView(generics.ListCreateAPIView):
 				"activity_type"
 			)
 		return CustomZonesConfig.objects.none()
+
+
+class ProcessActivitiesView(APIView):
+	"""View to trigger Strava activity processing for a user."""
+
+	def post(self, request: HttpRequest) -> Response:
+		user_strava_id = request.data.get("user_strava_id")
+
+		if not user_strava_id:
+			return Response(
+				{"error": "user_strava_id is required"}, status=status.HTTP_400_BAD_REQUEST
+			)
+
+		try:
+			# Convert to int, as request data might be string
+			user_strava_id = int(user_strava_id)
+		except ValueError:
+			return Response(
+				{"error": "Invalid user_strava_id format"}, status=status.HTTP_400_BAD_REQUEST
+			)
+
+		try:
+			worker = StravaHRWorker(user_strava_id=user_strava_id)
+			# For now, let's process all activities.
+			# We can add 'after_timestamp' as an optional param later.
+			worker.process_user_activities()
+			return Response(
+				{"message": f"Successfully processed activities for user {user_strava_id}"},
+				status=status.HTTP_200_OK,
+			)
+		except ValueError as e:
+			return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+		except Exception as e:
+			logger.error(f"Error processing activities for user {user_strava_id}: {e}")  # Used 'e'
+			return Response(
+				{"error": "An unexpected error occurred during processing."},
+				status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+			)

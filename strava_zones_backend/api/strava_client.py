@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 import datetime as dt
-import logging
 from typing import TYPE_CHECKING
 
 import pytz
 import requests
 from django.conf import settings
+
+from api.logging import get_logger
+from api.utils import decrypt_data
 
 if TYPE_CHECKING:
 	from typing import Any, TypedDict
@@ -21,7 +23,7 @@ if TYPE_CHECKING:
 		grant_type: str
 
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 # Strava API Endpoints
 STRAVA_API_BASE_URL = "https://www.strava.com/api/v3"
@@ -47,7 +49,7 @@ class StravaApiClient:
 			self.refresh_strava_token()
 		if self.strava_user.access_token is None:
 			raise ValueError("Access token is not available.")
-		return self.strava_user.access_token
+		return decrypt_data(self.strava_user.access_token)
 
 	@staticmethod
 	def get(
@@ -121,10 +123,9 @@ class StravaApiClient:
 			# This handles cases where token might be missing (e.g. app restart).
 			logger.info(f"No access token for user {self.strava_user.strava_id}, trying refresh.")
 			if not self.refresh_strava_token():
-				logger.error(
-					f"User {self.strava_user.strava_id} has no access token & refresh failed."
+				raise ValueError(
+					f"Cannot retrieve access token for user {self.strava_user.strava_id}."
 				)
-				return None
 
 		params: dict[str, int | str] = {"page": page, "per_page": per_page}
 		if before is not None:
@@ -293,10 +294,11 @@ class StravaApiClient:
 						f"Token refreshed. Retrying stream fetch for activity {activity_id}."
 					)
 					return self.fetch_activity_streams(activity_id, attempt_refresh=False)
-				logger.error(
+				err_msg = (
 					f"Token refresh failed for user {self.strava_user.strava_id}. "
 					f"Cannot fetch streams for activity {activity_id}."
 				)
+				raise ValueError(err_msg) from e
 			if e.response is not None and e.response.status_code == 404:
 				logger.warning(
 					f"Act {activity_id} not found/no streams (user {self.strava_user.strava_id})."

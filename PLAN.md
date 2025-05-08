@@ -41,13 +41,13 @@ This file outlines the development steps and serves as a checklist to track prog
     - [x] Implement logic to parse HR stream data.
     - [x] Implement logic to determine the custom zone for a given HR value based on user settings and activity type.
     - [x] Implement logic to calculate total time spent in each custom zone for a single activity.
-- [ ] **Data Aggregation & Storage**
-    - [ ] Create a mechanism (e.g., Django management command `process_activities`) to:
-        - [ ] Fetch activities for a given period.
-        - [ ] For each activity, fetch HR stream.
-        - [ ] Process stream against custom zones.
-        - [ ] Aggregate results weekly and monthly.
-        - [ ] Store aggregated results in `ZoneSummary` table (create or update).
+- [x] **Data Aggregation & Storage**
+    - [x] Create a mechanism (e.g., HTTP request to `process_activities`) to:
+        - [x] Fetch activities for a given period.
+        - [x] For each activity, fetch HR stream.
+        - [x] Process stream against custom zones.
+        - [x] Aggregate results weekly and monthly.
+        - [x] Store aggregated results in `ZoneSummary` table (create or update).
     - [ ] Consider background task queue (like Celery) for long-running processing (optional initial step).
 
 ## Phase 3: Backend API Endpoint
