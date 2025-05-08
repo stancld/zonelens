@@ -194,6 +194,17 @@ class AuthViewTests(APITestCase):
 		token = Token.objects.get(user=django_user)
 		self.assertEqual(response.context["token"], token.key)
 
+		# Verify user is logged in (session established by login() call)
+		self.assertTrue(
+			response.wsgi_request.user.is_authenticated,
+			"User should be authenticated in the session after login() call.",
+		)
+		self.assertEqual(
+			response.wsgi_request.user,
+			django_user,
+			"The authenticated session user should be the one created/retrieved during callback.",
+		)
+
 		# Verify tokens are stored encrypted (cannot check exact value easily)
 		self.assertNotEqual(strava_user._access_token, "test_access_token_123")
 		self.assertTrue(len(strava_user._access_token) > 50)  # Encrypted tokens are longer

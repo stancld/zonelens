@@ -8,7 +8,7 @@ from urllib.parse import urlencode
 
 import requests
 from django.conf import settings
-from django.contrib.auth import get_user_model
+from django.contrib.auth import get_user_model, login
 from django.http import (
 	HttpRequest,
 	HttpResponse,
@@ -98,6 +98,9 @@ def strava_callback(request: HttpRequest) -> HttpResponse:
 			token_data=token_data,
 			request=request,
 		)
+
+		# Log in the user to establish a session (necessary to store cookies for session auth)
+		login(request, user)
 
 		drf_token, _ = Token.objects.get_or_create(user=user)
 
