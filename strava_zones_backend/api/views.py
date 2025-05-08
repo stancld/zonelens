@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import calendar
 import logging
 from datetime import datetime
 from typing import TYPE_CHECKING
@@ -8,19 +9,23 @@ from urllib.parse import urlencode
 import requests
 from django.conf import settings
 from django.contrib.auth import get_user_model
-from django.http import HttpRequest, HttpResponse, HttpResponseBadRequest, HttpResponseRedirect
+from django.http import (
+	HttpRequest,
+	HttpResponse,
+	HttpResponseBadRequest,
+	HttpResponseRedirect,
+)
 from django.shortcuts import render
 from django.utils import timezone
 from rest_framework import generics, status
-from rest_framework.authentication import TokenAuthentication
 from rest_framework.authtoken.models import Token
-from rest_framework.decorators import api_view, authentication_classes, permission_classes
+from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from api.models import CustomZonesConfig, StravaUser
-from api.serializers import CustomZonesConfigSerializer
+from api.models import CustomZonesConfig, StravaUser, ZoneSummary
+from api.serializers import CustomZonesConfigSerializer, ZoneSummarySerializer
 from api.utils import encrypt_data
 from api.worker import StravaHRWorker
 
@@ -133,7 +138,7 @@ def _get_user(
 	return user
 
 
-def _generate_token_payload(code: str) -> TokenPayload:
+def _generate_token_payload(code: str) -> dict:
 	return {
 		"client_id": settings.STRAVA_CLIENT_ID,
 		"client_secret": settings.STRAVA_CLIENT_SECRET,
@@ -148,7 +153,6 @@ def index_view(request: HttpRequest) -> HttpResponse:
 
 
 @api_view(["GET"])
-@authentication_classes([TokenAuthentication])
 @permission_classes([IsAuthenticated])
 def user_profile(request: Request) -> Response:
 	"""Returns basic profile info for the authenticated user."""
@@ -235,3 +239,88 @@ class ProcessActivitiesView(APIView):
 				{"error": "An unexpected error occurred during processing."},
 				status=status.HTTP_500_INTERNAL_SERVER_ERROR,
 			)
+
+
+class ZoneSummaryView(APIView):
+	"""View to retrieve aggregated zone summary data for a user."""
+
+	permission_classes = [IsAuthenticated]
+
+	def get(self, request: HttpRequest) -> Response:
+		if not (year_str := request.query_params.get("year")) or not (
+			month_str := request.query_params.get("month")
+		):
+			return Response(
+				{"error": "'year' and 'month' query parameters are required."},
+				status=status.HTTP_400_BAD_REQUEST,
+			)
+
+		try:
+			year = int(year_str)
+			month = int(month_str)
+		except ValueError:
+			return Response(
+				{"error": "'year' and 'month' must be valid integers."},
+				status=status.HTTP_400_BAD_REQUEST,
+			)
+
+		if not (1 <= month <= 12):
+			return Response(
+				{"error": "'month' must be between 1 and 12."},
+				status=status.HTTP_400_BAD_REQUEST,
+			)
+		if not (2000 <= year <= datetime.now().year + 1):
+			return Response(
+				{"error": f"'year' must be between 2000 and {datetime.now().year + 1}."},
+				status=status.HTTP_400_BAD_REQUEST,
+			)
+
+		user_profile = request.user.strava_profile
+
+		# Fetch monthly summary
+		monthly_summary_qs, _created = ZoneSummary.get_or_create_summary(
+			user_profile=user_profile,
+			period_type=ZoneSummary.PeriodType.MONTHLY,  # type: ignore[arg-type]
+			year=year,
+			period_index=month,
+		)
+		monthly_serializer = ZoneSummarySerializer(monthly_summary_qs, many=False)
+
+		# Fetch weekly summaries
+		weekly_summaries = []
+		for week in sorted(self._determine_weeks_in_month(year, month)):
+			weekly_summary_qs, _created = ZoneSummary.get_or_create_summary(
+				user_profile=user_profile,
+				period_type=ZoneSummary.PeriodType.WEEKLY,  # type: ignore[arg-type]
+				year=year,
+				period_index=week,
+			)
+			if weekly_summary_qs:
+				weekly_summaries.append(weekly_summary_qs)
+
+		weekly_serializer = ZoneSummarySerializer(weekly_summaries, many=True)
+
+		return Response(
+			{
+				"message": "Zone summary data retrieved successfully.",
+				"year": year,
+				"month": month,
+				"monthly_summary": monthly_serializer.data,
+				"weekly_summaries": weekly_serializer.data,
+			},
+			status=status.HTTP_200_OK,
+		)
+
+	@staticmethod
+	def _determine_weeks_in_month(year: int, month: int) -> list[int]:
+		weeks_in_month = []
+		cal = calendar.Calendar()
+		month_days_weeks = cal.monthdatescalendar(year, month)
+		for week_days in month_days_weeks:
+			for day_date in week_days:
+				if day_date.year == year and day_date.month == month:
+					iso_year, iso_week, _ = day_date.isocalendar()
+					if iso_year == year and iso_week not in weeks_in_month:
+						weeks_in_month.append(iso_week)
+					break
+		return weeks_in_month

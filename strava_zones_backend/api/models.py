@@ -6,6 +6,7 @@ from typing import ClassVar
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import models
+from django.db.models import Sum
 from django.utils import timezone
 
 from api.logging import get_logger
@@ -146,6 +147,77 @@ class ZoneSummary(models.Model):
 
 	def __str__(self) -> str:
 		return f"{self.get_period_type_display()} summary for {self.user.strava_id} - {self.year}/{self.period_index}"  # noqa: E501
+
+	@classmethod
+	def get_or_create_summary(
+		cls,
+		*,
+		user_profile: StravaUser,
+		period_type: PeriodType,
+		year: int,
+		period_index: int | None = None,
+	) -> tuple[ZoneSummary | None, bool]:
+		"""Tries to fetch a ZoneSummary.
+
+		If not found or empty, calculates it from ActivityZoneTimes and saves it.
+		"""
+		summary, created = cls.objects.get_or_create(
+			user=user_profile,
+			period_type=period_type,
+			year=year,
+			period_index=period_index,
+			defaults={"zone_times_seconds": {}},  # Default to empty if we need to create
+		)
+
+		# Calculate if newly created or if the existing summary's zone_times is empty/default.
+		# This ensures that if an empty summary was somehow created before, it gets populated.
+		if created or not summary.zone_times_seconds or summary.zone_times_seconds == {}:
+			logger.info(
+				f"ZoneSummary for {user_profile.strava_id}, {period_type}, {year}-{period_index} "
+				"requires calculation."
+			)
+
+			activity_filters = {"user": user_profile, "activity_date__year": year}
+
+			if period_type == ZoneSummary.PeriodType.MONTHLY:
+				activity_filters["activity_date__month"] = period_index
+			elif period_type == ZoneSummary.PeriodType.WEEKLY:
+				# Using 'activity_date__week' for ISO week number (1-53 typically)
+				# Ensure this matches how weeks are defined∂ elsewhere if not ISO 8601 week.
+				activity_filters["activity_date__week"] = period_index
+
+			aggregated_times = (
+				ActivityZoneTimes.objects.filter(**activity_filters)
+				.values("zone_name")
+				.annotate(total_duration=Sum("duration_seconds"))
+				.order_by("zone_name")
+			)
+
+			new_zone_times = {
+				item["zone_name"]: item["total_duration"]
+				for item in aggregated_times
+				if item["total_duration"] and item["total_duration"] > 0
+			}
+
+			if new_zone_times:
+				summary.zone_times_seconds = new_zone_times
+				summary.save()
+				logger.info(
+					f"Calculated and saved ZoneSummary for {user_profile.strava_id}, "
+					f"{period_type}, {year}-{period_index}."
+				)
+			elif created:
+				logger.info(
+					f"No activities found to create ZoneSummary for {user_profile.strava_id}, "
+					f"{period_type}, {year}-{period_index}. Empty summary saved."
+				)
+			else:
+				logger.info(
+					f"No new activity data to update ZoneSummary for {user_profile.strava_id}, "
+					f"{period_type}, {year}-{period_index}."
+				)
+
+		return summary, created
 
 
 class ActivityZoneTimes(models.Model):
