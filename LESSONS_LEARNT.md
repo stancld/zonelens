@@ -1,12 +1,82 @@
 # Lessons Learned While Experimenting with Windsurf, Claude Sonnet 3.7, and Gemini 2.5 Pro
+This guide outlines practical tips and best practices for working effectively with LLM-based coding assistants. These insights are drawn from hands-on experience building Stridely and experimenting with models like Windsurf, Claude Sonnet 3.7, and Gemini 2.5 Pro.
 
 ## Git Is Your Best Friend
-Large Language Models (LLMs) are excellent at generating large volumes of code quickly. However, they can also unintentionally modify existing logic or introduce regressions when proposing changes. Robust version control is essential. My preferred workflow involves tracking all file versions before prompting the LLM. This way, I can isolate and review the changes separately — often keeping LLM-generated outputs in untracked files for clarity and safety.
+Large Language Models (LLMs) are excellent at generating large volumes of code quickly. However, they can unintentionally modify existing logic or introduce regressions. Robust version control is essential.
+
+### Best practices:
+
+- Always commit a working state before prompting an LLM for new features or refactoring.
+- Use git diff to review suggested changes before merging them.
+- Keep LLM-generated code in untracked files when experimenting.
+- Use feature branches to isolate experimental work.
+- Be ready to revert if things go sideways.
 
 ## Start with a Project Roadmap
-LLMs tend to wander from the core objective, especially if left unguided. They often jump ahead and implement extra features before they’re needed. Writing a clear project roadmap or scope before you begin helps anchor the conversation and keeps the generation process on track. Tip: It’s surprisingly productive (and fun) to let the LLM help draft this roadmap with you.
+LLMs tend to wander from the core objective, especially when left unguided. They often implement premature features or shift direction unexpectedly. Writing a roadmap helps anchor the generation process.
+
+### Tips:
+
+- Define your MVP features clearly before adding “nice-to-haves.”
+- Break down complex features into smaller, manageable components.
+- Let the LLM help you brainstorm the roadmap — it’s often surprisingly effective.
+- Document architectural decisions to stay aligned over time.
 
 ## Define Code Generation Guidelines Upfront
-To get consistent, maintainable output from LLMs, it's helpful to explicitly state your expectations regarding code style, formatting, in-line comments, naming conventions, etc. Clear instructions tend to significantly improve the relevance and readability of the generated code.
+To get maintainable, consistent output from an LLM, you need to explicitly specify your expectations. This includes formatting, naming conventions, structure, and comment style.
+### Recommendations:
 
-Co-authored by a free-tier OpenAI ChatGPT.
+- Establish coding standards in a shared document (e.g., docs/code_guidelines.md).
+- Be consistent with project structure and style.
+- Use tools like ruff, mypy, pre-commit, and linters to enforce consistency.
+- Refine guidelines as needed when output quality is lacking.
+
+## LLMs Are Great at Writing Code—But Not at Fixing It
+LLMs can generate both implementation and test code — but they’re often unreliable at debugging. Prompting them to find and fix issues frequently leads to broken or inconsistent behavior.
+### Better strategy:
+
+- Use static analysis tools (mypy, linters) to catch type and syntax issues early.
+- Debug with pdb to get hands-on insight — it's usually faster and more reliable.
+- Manually verify functionality before merging LLM-suggested changes.
+- Avoid prompting the model to "guess" what’s wrong — it often leads to more confusion than clarity.
+
+## Communicate Clearly with the Model
+The quality of an LLM’s output is directly tied to the quality of your prompt. Clear, specific instructions help prevent misunderstandings.
+### Guidelines:
+
+- Be specific and direct with your requests.
+- Provide relevant context, such as prior design choices or goals.
+- Point out known errors rather than asking the LLM to find them.
+- Br    eak tasks into smaller, well-defined steps for better control.
+
+## Collaborate Iteratively
+Treat the LLM as a capable partner — not an all-knowing oracle. Use it to assist in exploration, but apply your judgment to refine its suggestions.
+### Working style:
+
+- Start simple and iterate. Don't try to build everything in one go.
+- Continuously review and refine generated code.
+- Combine your domain knowledge with the LLM’s capabilities.
+- Provide feedback (even conversationally) to guide future interactions.
+
+## Test Thoroughly
+Just like human-written code, LLM-generated code must be tested rigorously.
+### Testing strategy:
+
+- Always review the logic and functionality manually.
+- Ask the LLM to write tests, but validate them carefully.
+- Test edge cases and error conditions explicitly.
+- Incorporate automated testing into your development pipeline.
+
+## Manage Complexity and Scope
+LLMs often introduce unnecessary complexity. Stay focused on core functionality and defer advanced features until the foundation is solid.
+### Advice:
+
+- Be mindful of “feature creep” — resist the urge to implement everything at once.
+- Maintain a clear separation of concerns in your architecture.
+- Keep documentation in sync with code and decisions.
+- Prioritize readability and maintainability over novelty.
+
+## Final Thoughts
+Effective LLM-assisted development is a skill — one that improves with experience. By applying structured workflows, clear communication, and a collaborative mindset, you can get the most out of tools like Claude Sonnet, Gemini, and Windsurf.
+
+Co-authored with a free-tier OpenAI ChatGPT.
