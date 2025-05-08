@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from datetime import datetime
 from typing import TYPE_CHECKING
 from urllib.parse import urlencode
 
@@ -189,26 +190,39 @@ class ProcessActivitiesView(APIView):
 	"""View to trigger Strava activity processing for a user."""
 
 	def post(self, request: HttpRequest) -> Response:
-		user_strava_id = request.data.get("user_strava_id")
-
-		if not user_strava_id:
+		if not (user_strava_id_str := request.data.get("user_strava_id")):
 			return Response(
 				{"error": "user_strava_id is required"}, status=status.HTTP_400_BAD_REQUEST
 			)
-
 		try:
-			# Convert to int, as request data might be string
-			user_strava_id = int(user_strava_id)
+			user_strava_id = int(user_strava_id_str)
 		except ValueError:
 			return Response(
 				{"error": "Invalid user_strava_id format"}, status=status.HTTP_400_BAD_REQUEST
 			)
 
+		after_timestamp_unix: int | None = None
+		if after_timestamp_iso_str := request.data.get("after_timestamp"):
+			try:
+				# Parse ISO 8601 string to datetime object
+				dt_object = datetime.fromisoformat(after_timestamp_iso_str.replace("Z", "+00:00"))
+				# Ensure it's timezone-aware (UTC if no offset specified or 'Z' was used)
+				if dt_object.tzinfo is None or dt_object.tzinfo.utcoffset(dt_object) is None:
+					dt_object = dt_object.replace(tzinfo=timezone.utc)
+				# Convert to Unix timestamp (integer seconds)
+				after_timestamp_unix = int(dt_object.timestamp())
+			except ValueError:
+				return Response(
+					{
+						"error": "Invalid after_timestamp format. "
+						"Expected ISO 8601 string (e.g., YYYY-MM-DDTHH:MM:SSZ)."
+					},
+					status=status.HTTP_400_BAD_REQUEST,
+				)
+
 		try:
 			worker = StravaHRWorker(user_strava_id=user_strava_id)
-			# For now, let's process all activities.
-			# We can add 'after_timestamp' as an optional param later.
-			worker.process_user_activities()
+			worker.process_user_activities(after_timestamp=after_timestamp_unix)
 			return Response(
 				{"message": f"Successfully processed activities for user {user_strava_id}"},
 				status=status.HTTP_200_OK,
@@ -216,7 +230,7 @@ class ProcessActivitiesView(APIView):
 		except ValueError as e:
 			return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 		except Exception as e:
-			logger.error(f"Error processing activities for user {user_strava_id}: {e}")  # Used 'e'
+			logger.error(f"Error processing activities for user {user_strava_id}: {e}")
 			return Response(
 				{"error": "An unexpected error occurred during processing."},
 				status=status.HTTP_500_INTERNAL_SERVER_ERROR,

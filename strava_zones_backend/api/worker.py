@@ -71,7 +71,7 @@ class StravaHRWorker:
 	def process_user_activities(self, after_timestamp: int | None = None) -> None:  # noqa: C901
 		"""Process user activities.
 
-		Fetches user's Strava activities after a given timestamp,
+		Fetches user's Strava activities after a given unix timestamp,
 		processes heart rate data, and stores results in ActivityZoneTimes.
 		"""
 		self.logger.info(f"Starting activity processing for user {self.user.strava_id}.")
