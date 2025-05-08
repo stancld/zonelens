@@ -48,17 +48,15 @@ This file outlines the development steps and serves as a checklist to track prog
         - [x] Process stream against custom zones.
         - [x] Aggregate results weekly and monthly.
         - [x] Store aggregated results in `ZoneSummary` table (create or update).
-    - [ ] Consider background task queue (like Celery) for long-running processing (optional initial step).
 
 ## Phase 3: Backend API Endpoint
 
-- [ ] **Zone Data API Endpoint**
-    - [ ] Implement `GET /api/zones?year=YYYY&month=MM` view.
+- [x] **Zone Data API Endpoint**
+    - [x] Implement `GET /api/zones?year=YYYY&month=MM` view.
     - [ ] Add authentication/permission checks (user must be logged in).
-    - [ ] Retrieve relevant weekly/monthly `ZoneSummary` data from DB for the user/period.
-    - [ ] (Optional) Trigger background processing if data is missing/stale.
-    - [ ] Add URL pattern for the zones data view.
-    - [ ] Add serializer (DRF) for `ZoneSummary`.
+    - [x] Retrieve relevant weekly/monthly `ZoneSummary` data from DB for the user/period.
+    - [x] Add URL pattern for the zones data view.
+    - [x] Add serializer (DRF) for `ZoneSummary`.
 
 ## Phase 4: Chrome Extension Frontend
 

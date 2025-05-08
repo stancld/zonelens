@@ -2,10 +2,11 @@ from __future__ import annotations
 
 import json
 import unittest.mock
-from datetime import datetime
+from datetime import datetime, timedelta
 from unittest.mock import MagicMock, patch
 from urllib.parse import urlparse
 
+import pytz
 import requests_mock
 from django.contrib.auth import get_user_model
 from django.test import TestCase, override_settings
@@ -1104,3 +1105,159 @@ class StravaHRWorkerTests(TestCase):
 		self.assertEqual(
 			ActivityZoneTimes.objects.count(), 0
 		)  # No zones should be saved if streams fail
+
+
+class ZoneSummaryViewTests(APITestCase):
+	def setUp(self) -> None:
+		self.django_user = get_user_model().objects.create_user(
+			username="testsummaryuser", password="password"
+		)
+		self.strava_user_id = 304676  # Using a test-specific ID or one from example
+		self.strava_user = StravaUser.objects.create(
+			user=self.django_user,
+			strava_id=self.strava_user_id,
+			_access_token=encrypt_data("dummy_access_summary"),
+			_refresh_token=encrypt_data("dummy_refresh_summary"),
+			token_expires_at=timezone.now() + timedelta(hours=1),
+			scope="read,activity:read_all",
+		)
+		self.token = Token.objects.create(user=self.django_user)
+		self.client.credentials(HTTP_AUTHORIZATION=f"Token {self.token.key}")
+
+		# Data for March 2025
+		# Week 9 of 2025 is Feb 24 - Mar 2. Activities on Mar 1 & 2 fall in this week and month.
+		# Activity 1: March 1, 2025 (Saturday, Week 9)
+		activity1_date = datetime(2025, 3, 1, 10, 0, 0, tzinfo=pytz.UTC)
+		ActivityZoneTimes.objects.create(
+			user=self.strava_user,
+			activity_id=101,
+			zone_name="Z1 Endurance",
+			duration_seconds=5062,
+			activity_date=activity1_date,
+		)
+		ActivityZoneTimes.objects.create(
+			user=self.strava_user,
+			activity_id=101,
+			zone_name="Z2 Moderate",
+			duration_seconds=1014,
+			activity_date=activity1_date,
+		)
+		ActivityZoneTimes.objects.create(
+			user=self.strava_user,
+			activity_id=101,
+			zone_name="Z3 Tempo",
+			duration_seconds=49,
+			activity_date=activity1_date,
+		)
+
+		# Activity 2: March 2, 2025 (Sunday, Week 9)
+		activity2_date = datetime(2025, 3, 2, 11, 0, 0, tzinfo=pytz.UTC)
+		ActivityZoneTimes.objects.create(
+			user=self.strava_user,
+			activity_id=102,
+			zone_name="Z4 Threshold",
+			duration_seconds=264,
+			activity_date=activity2_date,
+		)
+		ActivityZoneTimes.objects.create(
+			user=self.strava_user,
+			activity_id=102,
+			zone_name="Z5 Anaerobic",
+			duration_seconds=1662,
+			activity_date=activity2_date,
+		)
+
+		# Activity 3: March 3, 2025 (Monday, Week 10)
+		activity3_date = datetime(2025, 3, 3, 12, 0, 0, tzinfo=pytz.UTC)
+		ActivityZoneTimes.objects.create(
+			user=self.strava_user,
+			activity_id=103,
+			zone_name="Z1 Endurance",
+			duration_seconds=1000,
+			activity_date=activity3_date,
+		)
+		ActivityZoneTimes.objects.create(
+			user=self.strava_user,
+			activity_id=103,
+			zone_name="Z2 Moderate",
+			duration_seconds=2000,
+			activity_date=activity3_date,
+		)
+
+	def test_get_zone_summary_calculated(self) -> None:
+		url = reverse("zone_summary")
+		response = self.client.get(url, {"year": 2025, "month": 3})
+
+		self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+		data = response.json()  # Using .json() method for APITestCase response
+		self.assertEqual(data["year"], 2025)
+		self.assertEqual(data["month"], 3)
+
+		monthly_summary_data = data["monthly_summary"]
+		self.assertEqual(monthly_summary_data["period_type"], "MONTHLY")
+		self.assertEqual(monthly_summary_data["year"], 2025)
+		self.assertEqual(monthly_summary_data["period_index"], 3)
+		self.assertEqual(monthly_summary_data["user"], self.strava_user.strava_id)
+
+		expected_monthly_zones = {
+			"Z1 Endurance": 5062 + 1000,
+			"Z2 Moderate": 1014 + 2000,
+			"Z3 Tempo": 49,
+			"Z4 Threshold": 264,
+			"Z5 Anaerobic": 1662,
+		}
+		self.assertDictEqual(monthly_summary_data["zone_times_seconds"], expected_monthly_zones)
+
+		# Weekly Summary Assertions
+		self.assertTrue(
+			len(data["weekly_summaries"]) >= 2, "Should find at least summaries for week 9 and 10"
+		)
+
+		week9_summary_data = None
+		week10_summary_data = None
+		for weekly_summary in data["weekly_summaries"]:
+			if weekly_summary["period_index"] == 9 and weekly_summary["year"] == 2025:
+				week9_summary_data = weekly_summary
+			elif weekly_summary["period_index"] == 10 and weekly_summary["year"] == 2025:
+				week10_summary_data = weekly_summary
+
+		self.assertIsNotNone(week9_summary_data, "Week 9 summary not found in response")
+		if week9_summary_data:
+			self.assertEqual(week9_summary_data["period_type"], "WEEKLY")
+			self.assertEqual(week9_summary_data["user"], self.strava_user_id)
+			expected_week9_zones = {
+				"Z1 Endurance": 5062,
+				"Z2 Moderate": 1014,
+				"Z3 Tempo": 49,
+				"Z4 Threshold": 264,
+				"Z5 Anaerobic": 1662,
+			}
+			self.assertDictEqual(week9_summary_data["zone_times_seconds"], expected_week9_zones)
+
+		self.assertIsNotNone(week10_summary_data, "Week 10 summary not found in response")
+		if week10_summary_data:
+			self.assertEqual(week10_summary_data["period_type"], "WEEKLY")
+			self.assertEqual(week10_summary_data["user"], self.strava_user_id)
+			expected_week10_zones = {
+				"Z1 Endurance": 1000,
+				"Z2 Moderate": 2000,
+			}
+			self.assertDictEqual(week10_summary_data["zone_times_seconds"], expected_week10_zones)
+
+		# Check database persistence for the specific summaries we expect to be created
+		self.assertTrue(
+			ZoneSummary.objects.filter(
+				user=self.strava_user, period_type="MONTHLY", year=2025, period_index=3
+			).exists()
+		)
+		self.assertTrue(
+			ZoneSummary.objects.filter(
+				user=self.strava_user, period_type="WEEKLY", year=2025, period_index=9
+			).exists()
+		)
+		self.assertTrue(
+			ZoneSummary.objects.filter(
+				user=self.strava_user, period_type="WEEKLY", year=2025, period_index=10
+			).exists()
+		)

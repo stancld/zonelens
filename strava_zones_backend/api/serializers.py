@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING
 
 from rest_framework import serializers
 
-from api.models import ActivityType, CustomZonesConfig, HeartRateZone
+from api.models import ActivityType, CustomZonesConfig, HeartRateZone, ZoneSummary
 
 if TYPE_CHECKING:
 	from typing import Any
@@ -52,3 +52,18 @@ class CustomZonesConfigSerializer(serializers.ModelSerializer):
 				HeartRateZone.objects.create(config=instance, **zone_data)
 
 		return instance
+
+
+class ZoneSummarySerializer(serializers.ModelSerializer):
+	class Meta:
+		model = ZoneSummary
+		fields = [
+			"id",
+			"user",
+			"period_type",
+			"year",
+			"period_index",
+			"zone_times_seconds",
+			"updated_at",
+		]
+		read_only_fields = ["id", "user", "updated_at"]
