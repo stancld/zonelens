@@ -52,11 +52,11 @@ STRAVA_AUTH_URL = "https://www.strava.com/oauth/authorize"
 STRAVA_TOKEN_URL = "https://www.strava.com/oauth/token"
 
 
-def strava_authorize(request: HttpRequest) -> HttpResponseRedirect:  # noqa: ARG001
+def strava_authorize(request: HttpRequest) -> HttpResponseRedirect:
 	"""Redirects the user to Strava's authorization page."""
 	scopes = "read,activity:read_all,profile:read_all"
 	client_id = settings.STRAVA_CLIENT_ID
-	redirect_uri = "http://127.0.0.1:8000/api/auth/strava/callback"
+	redirect_uri = f"{request.scheme}://127.0.0.1:8000/api/auth/strava/callback"
 
 	params = {
 		"client_id": client_id,
