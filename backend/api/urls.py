@@ -13,6 +13,14 @@ urlpatterns = [
 		views.CustomZonesSettingsView.as_view(),
 		name="custom_zones_settings",
 	),
-	path("process-activities/", views.ProcessActivitiesView.as_view(), name="process_activities"),
-	path("zones/", views.ZoneSummaryView.as_view(), name="zone_summary"),
+	path(
+		"strava/sync-activities/",
+		views.ProcessActivitiesView.as_view(),
+		name="strava_sync_activities",
+	),
+	path(
+		"zones/",
+		views.ZoneSummaryView.as_view(),
+		name="zone_summary",
+	),
 ]

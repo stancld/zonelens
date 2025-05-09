@@ -194,18 +194,19 @@ class CustomZonesSettingsView(generics.ListCreateAPIView):
 
 
 class ProcessActivitiesView(APIView):
-	"""View to trigger Strava activity processing for a user."""
+	"""View to trigger Strava activities syncing and processing for a user."""
 
-	def post(self, request: HttpRequest) -> Response:
-		if not (user_strava_id_str := request.data.get("user_strava_id")):
-			return Response(
-				{"error": "user_strava_id is required"}, status=status.HTTP_400_BAD_REQUEST
-			)
+	permission_classes = [IsAuthenticated]
+
+	def post(self, request: Request) -> Response:
 		try:
-			user_strava_id = int(user_strava_id_str)
-		except ValueError:
+			strava_user_profile = request.user.strava_profile
+			user_strava_id = strava_user_profile.strava_id
+		except AttributeError:
+			logger.error(f"User {request.user.username} does not have a Strava profile linked.")
 			return Response(
-				{"error": "Invalid user_strava_id format"}, status=status.HTTP_400_BAD_REQUEST
+				{"error": "Strava profile not found for this user."},
+				status=status.HTTP_400_BAD_REQUEST,
 			)
 
 		after_timestamp_unix: int | None = None
@@ -237,7 +238,7 @@ class ProcessActivitiesView(APIView):
 		except ValueError as e:
 			return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 		except Exception as e:
-			logger.error(f"Error processing activities for user {user_strava_id}: {e}")
+			logger.exception(f"Error processing activities for user {user_strava_id}: {e}")
 			return Response(
 				{"error": "An unexpected error occurred during processing."},
 				status=status.HTTP_500_INTERNAL_SERVER_ERROR,

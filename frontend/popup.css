@@ -1,0 +1,88 @@
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  background-color: #FFFFFF;
+  color: #333333;
+  margin: 0;
+  padding: 15px;
+  width: 300px; /* Or a width that suits your content */
+  font-size: 14px;
+}
+
+h1 {
+  font-size: 18px;
+  color: #333333;
+  margin-top: 0;
+  margin-bottom: 15px;
+  text-align: center;
+}
+
+label {
+  display: block;
+  margin-bottom: 5px;
+  font-weight: bold;
+  font-size: 13px;
+}
+
+input[type="date"],
+input[type="text"] {
+  width: calc(100% - 18px); /* Full width minus padding */
+  padding: 8px;
+  margin-bottom: 15px;
+  border: 1px solid #CCCCCC;
+  border-radius: 4px;
+  font-size: 14px;
+  box-sizing: border-box;
+}
+
+.button-container {
+  text-align: center;
+}
+
+button {
+  background-color: #FC4C02; /* Strava Orange */
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 4px;
+  font-weight: bold;
+  font-size: 14px;
+  cursor: pointer;
+  transition: background-color 0.2s ease-in-out;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+button:hover {
+  background-color: #e04402; /* Slightly darker orange for hover */
+}
+
+button:disabled {
+  background-color: #CCCCCC;
+  cursor: not-allowed;
+}
+
+#statusMessage {
+  margin-top: 15px;
+  font-size: 13px;
+  text-align: center;
+  padding: 8px;
+  border-radius: 4px;
+}
+
+.status-success {
+    color: #155724;
+    background-color: #d4edda;
+    border: 1px solid #c3e6cb;
+}
+
+.status-error {
+    color: #721c24;
+    background-color: #f8d7da;
+    border: 1px solid #f5c6cb;
+}
+
+.status-info {
+    color: #0c5460;
+    background-color: #d1ecf1;
+    border: 1px solid #bee5eb;
+}

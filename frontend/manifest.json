@@ -6,7 +6,8 @@
   "permissions": [
     "activeTab",
     "storage",
-    "scripting"
+    "scripting",
+    "cookies"
   ],
   "host_permissions": [
     "*://*.strava.com/*",
