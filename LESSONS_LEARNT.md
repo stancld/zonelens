@@ -24,6 +24,11 @@ LLMs tend to wander from the core objective, especially when left unguided. They
 
 ## Define Code Generation Guidelines Upfront
 To get maintainable, consistent output from an LLM, you need to explicitly specify your expectations. This includes formatting, naming conventions, structure, and comment style.
+
+## Explore AI Agents with Desktop/Browser Interaction Capabilities
+*   **Context:** Developing web GUIs and applications often involves repetitive manual checks like inspecting network logs, verifying DOM elements, or copying error messages from browser consoles back to the AI.
+*   **Hypothesis/Untapped Potential:** While not extensively used in the current project, there appears to be significant potential in AI agents that can directly interact with the desktop environment (e.g., open developer tools, read console output, inspect network requests). Such capabilities could drastically reduce manual effort and speed up the development cycle, allowing the developer to focus on higher-level problem-solving. This is a promising area for future workflow enhancements.
+
 ### Recommendations:
 
 - Establish coding standards in a shared document (e.g., docs/code_guidelines.md).
@@ -47,7 +52,7 @@ The quality of an LLM’s output is directly tied to the quality of your prompt.
 - Be specific and direct with your requests.
 - Provide relevant context, such as prior design choices or goals.
 - Point out known errors rather than asking the LLM to find them.
-- Br    eak tasks into smaller, well-defined steps for better control.
+- Break tasks into smaller, well-defined steps for better control.
 
 ## Collaborate Iteratively
 Treat the LLM as a capable partner — not an all-knowing oracle. Use it to assist in exploration, but apply your judgment to refine its suggestions.
