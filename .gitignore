@@ -89,5 +89,4 @@ data/coverage.xml
 # HTTPS-related
 cert.crt
 cert.key
-key.pem
-cert.pem
+*.pem
