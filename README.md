@@ -45,7 +45,7 @@ A client-server model:
 
 ## 🚀 Quick Setup Guide
 
-1.  **Backend (Django):
+1.  **Backend (Django):**
     *   Set up Python & PostgreSQL.
     *   Install dependencies from `requirements.txt` (if available, or see `PLAN.md` for a list).
     *   Configure `.env` with Strava API credentials and database settings.
