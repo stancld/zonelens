@@ -177,6 +177,14 @@ STATIC_URL = "static/"
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
+CSRF_COOKIE_SAMESITE = "None"
+CSRF_COOKIE_SECURE = True
+CSRF_TRUSTED_ORIGINS = [
+	"https://localhost:8000",
+	"https://127.0.0.1:8000",
+	f"chrome-extension://{os.getenv('CHROME_EXTENSION_ID')}",  # hard-coded for local development
+]
+
 # Custom Settings for REST Framework
 REST_FRAMEWORK = {
 	"DEFAULT_RENDERER_CLASSES": [

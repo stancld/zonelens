@@ -141,6 +141,10 @@ class StravaHRWorker:
 						},
 					)
 			processed_count += 1
+			self.logger.info(
+				f"[SUCESS] Activity {activity_id} for user {self.user.strava_id} "
+				f"(date: {activity_date.date()})."
+			)
 
 		self.logger.info(
 			f"Finished processing for user {self.user.strava_id}. "

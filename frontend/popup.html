@@ -1,23 +1,24 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Strava HR Zones</title>
-  <link rel="stylesheet" type="text/css" href="styles.css">
-  <style>
-    body {
-      width: 250px;
-      padding: 10px;
-      font-family: Arial, sans-serif;
-    }
-    h3 {
-      margin-top: 0;
-    }
-  </style>
+    <title>Strava Activity Sync</title>
+    <meta charset="utf-8">
+    <link rel="stylesheet" href="popup.css">
 </head>
 <body>
-  <h3>Strava HR Zones Display</h3>
-  <p>This extension enhances your Strava calendar with HR zone data.</p>
-  <p>Configuration options will be available here soon.</p>
-  <!-- <script src="popup.js"></script> -->
+    <h1>Strava Activity Sync</h1>
+
+    <label for="afterDate">Sync activities after (optional):</label>
+    <input type="date" id="afterDate">
+
+    <div class="button-container">
+        <!-- The Login button might be conditionally shown or removed depending on auth state later -->
+        <!-- <button id="loginButton">Login with Strava</button> -->
+        <button id="syncButton">Sync Strava Activities</button>
+    </div>
+
+    <div id="statusMessage"></div>
+
+    <script src="popup.js"></script>
 </body>
 </html>

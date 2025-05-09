@@ -64,11 +64,13 @@ This file outlines the development steps and serves as a checklist to track prog
     - [x] Create `extension` directory.
     - [x] Create `manifest.json` (version 3):
         - [x] Define name, version, description.
-        - [x] Request permissions (`storage`, `identity` (optional), host permissions for `strava.com` and backend URL).
+        - [x] Request permissions (`storage`, `cookies`, host permissions for `strava.com` and backend URL).
         - [ ] Define background service worker.
         - [x] Define content script (target `strava.com/athlete/calendar*`).
-        - [ ] Define browser action (popup).
-    - [ ] Create simple `popup.html` and `popup.js`.
+        - [x] Define browser action (popup) and icons.
+    - [x] Create simple `popup.html` and `popup.js`.
+    - [x] Implement CSRF token handling for backend requests from extension (`settings.py`, `popup.js`).
+    - [x] Configure local HTTPS development environment (`mkcert`, Django dev server settings).
     - [ ] Add button/link in popup to initiate auth (redirects to backend `/api/auth/strava`).
     - [ ] Create `background.js` to handle potential message passing.
     - [ ] Implement logic to store/manage backend session/token in `chrome.storage.local` after successful auth callback.
@@ -93,7 +95,9 @@ This file outlines the development steps and serves as a checklist to track prog
 
 - [x] Implement Strava token refresh logic in the backend.
 - [ ] Add comprehensive error handling (API limits, network errors, backend errors, extension errors).
-- [ ] Improve UI/UX of the extension popup, options page, and injected plots.
+- [x] Improve UI/UX of the extension popup (styling to match Strava, dynamic status messages).
+- [ ] Improve UI/UX of the options page and injected plots.
+- [x] Use environment variable for `CHROME_EXTENSION_ID` in `CSRF_TRUSTED_ORIGINS` (`settings.py`).
 - [ ] Add backend tests (unit/integration, especially for processing logic).
 - [ ] Add frontend tests (optional).
 - [ ] Consider optimisations for data fetching and processing.
