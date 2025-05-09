@@ -71,12 +71,15 @@ INSTALLED_APPS = [
 	"django.contrib.messages",
 	"django.contrib.staticfiles",
 	# Third-party apps
+	"corsheaders",
+	"django_extensions",  # Added for runserver_plus
 	# Your apps
 	"api.apps.ApiConfig",
 ]
 
 MIDDLEWARE = [
 	"django.middleware.security.SecurityMiddleware",
+	"corsheaders.middleware.CorsMiddleware",
 	"django.contrib.sessions.middleware.SessionMiddleware",
 	"django.middleware.common.CommonMiddleware",
 	"django.middleware.csrf.CsrfViewMiddleware",
@@ -181,9 +184,24 @@ REST_FRAMEWORK = {
 		"rest_framework.renderers.BrowsableAPIRenderer",
 	],
 	"DEFAULT_AUTHENTICATION_CLASSES": [
+		"rest_framework.authentication.SessionAuthentication",
 		"rest_framework.authentication.TokenAuthentication",
 	],
 }
+
+# CORS settings
+CORS_ALLOWED_ORIGINS = [
+	"https://www.strava.com",
+	"http://localhost:8000",
+	"http://127.0.0.1:8000",
+	"https://localhost:8000",
+	"https://127.0.0.1:8000",
+]
+CORS_ALLOW_CREDENTIALS = True
+
+# Session Cookie Settings for cross-site requests
+SESSION_COOKIE_SAMESITE = "None"  # Allow sending cookie on cross-site requests
+SESSION_COOKIE_SECURE = True
 
 # Fernet encryption settings for token storage
 FERNET_KEY = os.getenv("FERNET_KEY")

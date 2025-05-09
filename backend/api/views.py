@@ -8,7 +8,7 @@ from urllib.parse import urlencode
 
 import requests
 from django.conf import settings
-from django.contrib.auth import get_user_model
+from django.contrib.auth import get_user_model, login
 from django.http import (
 	HttpRequest,
 	HttpResponse,
@@ -52,11 +52,11 @@ STRAVA_AUTH_URL = "https://www.strava.com/oauth/authorize"
 STRAVA_TOKEN_URL = "https://www.strava.com/oauth/token"
 
 
-def strava_authorize(request: HttpRequest) -> HttpResponseRedirect:  # noqa: ARG001
+def strava_authorize(request: HttpRequest) -> HttpResponseRedirect:
 	"""Redirects the user to Strava's authorization page."""
 	scopes = "read,activity:read_all,profile:read_all"
 	client_id = settings.STRAVA_CLIENT_ID
-	redirect_uri = "http://127.0.0.1:8000/api/auth/strava/callback"
+	redirect_uri = f"{request.scheme}://localhost:8000/api/auth/strava/callback"
 
 	params = {
 		"client_id": client_id,
@@ -98,6 +98,9 @@ def strava_callback(request: HttpRequest) -> HttpResponse:
 			token_data=token_data,
 			request=request,
 		)
+
+		# Log in the user to establish a session (necessary to store cookies for session auth)
+		login(request, user)
 
 		drf_token, _ = Token.objects.get_or_create(user=user)
 
