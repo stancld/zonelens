@@ -1,0 +1,161 @@
+:root {
+  --zone5-color: #E53935; /* Red */
+  --zone4-color: #FB8C00; /* Orange */
+  --zone3-color: #7CB342; /* Green */
+  --zone2-color: #1E88E5; /* Blue */
+  --zone1-color: #757575; /* Grey */
+}
+
+#hr-zones-summary-container {
+  background-color: #f9f9f9;
+  border: 1px solid #ddd;
+  padding: 15px;
+  margin-bottom: 20px;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  font-family: Arial, sans-serif;
+  position: fixed; /* Example: make it fixed for visibility during development */
+  top: 100px; /* Adjust as needed */
+  right: 20px; /* Adjust as needed */
+  width: 300px;
+  z-index: 10000; /* Ensure it's on top */
+}
+
+#hr-zones-monthly-summary-container {
+  background-color: #f9f9f9;
+  border: 1px solid #ddd;
+  padding: 15px;
+  margin-bottom: 20px;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  font-family: Arial, sans-serif;
+  position: fixed;
+  top: 100px;
+  left: 20px;
+  width: 320px;
+  z-index: 10000;
+}
+
+.strava-zones-header h3 {
+  margin-top: 0;
+  color: #333;
+  font-size: 1.2em;
+  margin-bottom: 10px;
+}
+
+.strava-zones-content p {
+  margin: 5px 0;
+  color: #555;
+}
+
+.strava-zones-content .zone-row {
+  margin-bottom: 8px;
+}
+
+.strava-zones-content .zone-label {
+  font-size: 0.9em;
+  color: #555;
+  margin-bottom: 3px;
+  display: block;
+}
+
+.strava-zones-content .zone-bar-container {
+  background-color: #eee;
+  border-radius: 3px;
+  height: 20px;
+  width: 100%;
+  display: flex;
+  font-size: 0.8em;
+  line-height: 20px;
+  color: white;
+  position: relative;
+}
+
+.strava-zones-content .zone-bar {
+  height: 100%;
+  border-radius: 3px 0 0 3px; /* Rounded only on the left if it's the only bar */
+}
+
+.strava-zones-content .zone-bar.zone1 { background-color: var(--zone1-color); }
+.strava-zones-content .zone-bar.zone2 { background-color: var(--zone2-color); }
+.strava-zones-content .zone-bar.zone3 { background-color: var(--zone3-color); }
+.strava-zones-content .zone-bar.zone4 { background-color: var(--zone4-color); }
+.strava-zones-content .zone-bar.zone5 { background-color: var(--zone5-color); }
+
+.strava-zones-content .zone-time-text {
+    position: absolute;
+    right: 5px;
+    top: 0;
+    line-height: 20px;
+    color: #333;
+    font-weight: bold;
+}
+
+/* Placeholder for weekly summaries - to be refined */
+.hr-zones-weekly-summary-container {
+  border: 1px dashed blue;
+  padding: 5px;
+  margin-top: 5px;
+  font-size: 0.8em;
+}
+
+/* Styles for the new weekly summary segmented bars */
+.injected-weekly-hr-summary {
+  display: flex;
+  flex-direction: column; /* Stack zone rows vertically */
+  width: 180px; /* Adjust width for a small panel */
+  height: auto; /* Height will be determined by content */
+  padding: 5px;
+  background-color: #fafafa;
+  border: 1px solid #e0e0e0;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+  margin-top: 2px; /* Add some space from the week row content if needed */
+  margin-bottom: 2px;
+}
+
+.injected-weekly-hr-summary .weekly-zone-row {
+  display: flex;
+  align-items: center;
+  margin-bottom: 2px; /* Space between mini zone rows */
+  font-size: 0.7em; /* Smaller font for weekly */
+}
+
+.injected-weekly-hr-summary .weekly-zone-label {
+  width: 25px; /* Space for 'Z5:', 'Z4:' etc. */
+  color: #666;
+  flex-shrink: 0;
+}
+
+.injected-weekly-hr-summary .weekly-zone-bar-container {
+  flex-grow: 1;
+  background-color: #f0f0f0;
+  border-radius: 2px;
+  height: 10px; /* Tiny bars */
+  position: relative;
+  margin-right: 5px;
+}
+
+.injected-weekly-hr-summary .weekly-zone-bar {
+  height: 100%;
+  border-radius: 2px 0 0 2px;
+}
+
+.injected-weekly-hr-summary .weekly-zone-time-text {
+  font-size: 0.9em; /* Relative to parent .weekly-zone-row */
+  color: #777;
+  white-space: nowrap;
+}
+
+/* Apply zone colors to weekly bars */
+.injected-weekly-hr-summary .weekly-zone-bar.zone1 { background-color: var(--zone1-color); }
+.injected-weekly-hr-summary .weekly-zone-bar.zone2 { background-color: var(--zone2-color); }
+.injected-weekly-hr-summary .weekly-zone-bar.zone3 { background-color: var(--zone3-color); }
+.injected-weekly-hr-summary .weekly-zone-bar.zone4 { background-color: var(--zone4-color); }
+.injected-weekly-hr-summary .weekly-zone-bar.zone5 { background-color: var(--zone5-color); }
+
+/* Ensure old single segment styles don't interfere if they were too broad */
+.injected-weekly-hr-summary .zone-segment.zone1 { background-color: var(--zone1-color); }
+.injected-weekly-hr-summary .zone-segment.zone2 { background-color: var(--zone2-color); }
+.injected-weekly-hr-summary .zone-segment.zone3 { background-color: var(--zone3-color); }
+.injected-weekly-hr-summary .zone-segment.zone4 { background-color: var(--zone4-color); }
+.injected-weekly-hr-summary .zone-segment.zone5 { background-color: var(--zone5-color); }

@@ -61,12 +61,12 @@ This file outlines the development steps and serves as a checklist to track prog
 ## Phase 4: Chrome Extension Frontend
 
 - [ ] **Basic Structure & Authentication Trigger**
-    - [ ] Create `extension` directory.
-    - [ ] Create `manifest.json` (version 3):
-        - [ ] Define name, version, description.
-        - [ ] Request permissions (`storage`, `identity` (optional), host permissions for `strava.com` and backend URL).
+    - [x] Create `extension` directory.
+    - [x] Create `manifest.json` (version 3):
+        - [x] Define name, version, description.
+        - [x] Request permissions (`storage`, `identity` (optional), host permissions for `strava.com` and backend URL).
         - [ ] Define background service worker.
-        - [ ] Define content script (target `strava.com/athlete/calendar*`).
+        - [x] Define content script (target `strava.com/athlete/calendar*`).
         - [ ] Define browser action (popup).
     - [ ] Create simple `popup.html` and `popup.js`.
     - [ ] Add button/link in popup to initiate auth (redirects to backend `/api/auth/strava`).
@@ -79,14 +79,14 @@ This file outlines the development steps and serves as a checklist to track prog
         - [ ] Fetch current settings from `GET /api/zones/settings`.
         - [ ] Send updated settings via `POST /api/zones/settings`.
 - [ ] **Calendar Injection & Data Display**
-    - [ ] Create `content.js`.
-    - [ ] Implement logic to detect calendar load/navigation.
-    - [ ] Extract current year/month from the Strava page.
-    *   [ ] Make authenticated call to backend `GET /api/zones` endpoint with year/month.
-    - [ ] Parse the JSON response (weekly/monthly aggregated data).
-    - [ ] Identify target locations in the Strava DOM to inject plots.
-    - [ ] Generate HTML elements for bar plots based on received data.
-    - [ ] Inject plots into the DOM.
+    - [x] Create `content.js`.
+    - [x] Implement logic to detect calendar load/navigation.
+    - [x] Extract current year/month from the Strava page.
+    - [x] Make authenticated call to backend `GET /api/zones` endpoint with year/month.
+    - [x] Parse the JSON response (weekly/monthly aggregated data).
+    - [x] Identify target locations in the Strava DOM to inject plots.
+    - [x] Generate HTML elements for bar plots based on received data.
+    - [x] Inject plots into the DOM.
     - [ ] Create `styles.css` for styling the plots and inject it.
 
 ## Phase 5: Refinement
