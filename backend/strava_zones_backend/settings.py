@@ -196,6 +196,10 @@ CORS_ALLOWED_ORIGINS = [
 ]
 CORS_ALLOW_CREDENTIALS = True
 
+# Session Cookie Settings for cross-site requests
+SESSION_COOKIE_SAMESITE = "None"  # Allow sending cookie on cross-site requests
+SESSION_COOKIE_SECURE = True
+
 # Fernet encryption settings for token storage
 FERNET_KEY = os.getenv("FERNET_KEY")
 if not FERNET_KEY:
