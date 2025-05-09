@@ -19,6 +19,8 @@ dependencies = [
     "cryptography",
     "pytz",
     "django-cors-headers",
+    "django-extensions",
+    "werkzeug"
 ]
 
 [project.optional-dependencies]

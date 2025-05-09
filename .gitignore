@@ -86,5 +86,8 @@ frontend/node_modules/
 .env.test.local
 .env.production.local
 data/coverage.xml
+# HTTPS-related
 cert.crt
 cert.key
+key.pem
+cert.pem

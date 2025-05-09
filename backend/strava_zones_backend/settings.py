@@ -72,6 +72,7 @@ INSTALLED_APPS = [
 	"django.contrib.staticfiles",
 	# Third-party apps
 	"corsheaders",
+	"django_extensions",  # Added for runserver_plus
 	# Your apps
 	"api.apps.ApiConfig",
 ]
@@ -193,6 +194,8 @@ CORS_ALLOWED_ORIGINS = [
 	"https://www.strava.com",
 	"http://localhost:8000",
 	"http://127.0.0.1:8000",
+	"https://localhost:8000",
+	"https://127.0.0.1:8000",
 ]
 CORS_ALLOW_CREDENTIALS = True
 
