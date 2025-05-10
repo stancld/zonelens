@@ -101,3 +101,45 @@ This file outlines the development steps and serves as a checklist to track prog
 - [ ] Add backend tests (unit/integration, especially for processing logic).
 - [ ] Add frontend tests (optional).
 - [ ] Consider optimisations for data fetching and processing.
+
+## Phase 6: Production-Level Deployment (AWS Free Tier)
+
+- [ ] **Infrastructure Setup (AWS Free Tier)**
+  - [ ] Define infrastructure requirements (e.g., EC2 for backend, S3 for frontend static assets, RDS for database if needed, or SQLite on EC2).
+  - [ ] Set up IAM roles and permissions.
+  - [ ] Configure VPC, subnets, security groups.
+  - [ ] Choose an appropriate EC2 instance type (t2.micro or t3.micro typically in free tier).
+  - [ ] Set up RDS if chosen, or configure SQLite on the EC2 instance.
+  - [ ] Configure S3 bucket for static frontend hosting (if applicable).
+  - [ ] Set up CloudFront CDN for frontend (optional, but good practice).
+
+- [ ] **Backend Deployment (Django)**
+  - [ ] Containerize the Django application (Docker).
+  - [ ] Set up a process manager (e.g., Gunicorn, Supervisor) on EC2.
+  - [ ] Configure a web server (e.g., Nginx) as a reverse proxy on EC2.
+  - [ ] Manage static files (collectstatic) and media files.
+  - [ ] Configure environment variables securely (e.g., AWS Systems Manager Parameter Store, or .env file with restricted permissions).
+  - [ ] Set up logging and monitoring (e.g., CloudWatch Logs).
+  - [ ] Database migrations.
+
+- [ ] **Frontend Deployment (Static)**
+  - [ ] Build frontend assets.
+  - [ ] Deploy to S3 (if S3 hosting chosen).
+  - [ ] Configure CloudFront to serve from S3 (if chosen).
+
+- [ ] **Domain and HTTPS**
+  - [ ] Register or use an existing domain name.
+  - [ ] Configure DNS records (e.g., Route 53).
+  - [ ] Set up HTTPS using AWS Certificate Manager (ACM) with Load Balancer or CloudFront.
+
+- [ ] **CI/CD (Optional for initial deployment, but recommended)**
+  - [ ] Set up a basic CI/CD pipeline (e.g., GitHub Actions, AWS CodePipeline) for automated deployments.
+
+- [ ] **Testing and Validation**
+  - [ ] Thoroughly test the deployed application in the production-like environment.
+  - [ ] Check all functionalities, including authentication, data fetching, and display.
+  - [ ] Perform basic security checks.
+
+- [ ] **Monitoring and Maintenance Plan**
+  - [ ] Define basic monitoring alerts (e.g., server down, high error rates).
+  - [ ] Plan for regular updates and security patching.
