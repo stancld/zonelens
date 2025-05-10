@@ -81,6 +81,10 @@ LLMs often introduce unnecessary complexity. Stay focused on core functionality 
 - Keep documentation in sync with code and decisions.
 - Prioritize readability and maintainability over novelty.
 
+## LLM Collaboration Nuances
+
+When working with LLMs (e.g., Gemini 2.5 Pro, Claude 3 Sonnet) on intricate code modifications, such as adjusting specific filter conditions within a complex method, they may sometimes propose larger-scale refactors rather than small, surgical changes. These expansive refactors can often be perplexing, creating unnecessary mess and potentially breaking existing functionality. For such fine-grained adjustments, it is frequently more effective to leverage one's own coding expertise to make the precise change, or to guide the LLM with very specific, constrained instructions. This highlights the importance of human oversight and a critical approach when pair-programming with AI, especially for delicate modifications in an existing codebase.
+
 ## Final Thoughts
 Effective LLM-assisted development is a skill — one that improves with experience. By applying structured workflows, clear communication, and a collaborative mindset, you can get the most out of tools like Claude Sonnet, Gemini, and Windsurf.
 
