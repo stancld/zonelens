@@ -1,4 +1,5 @@
 :root {
+  --sz-font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   --zone5-color: #E53935; /* Red */
   --zone4-color: #FB8C00; /* Orange */
   --zone3-color: #7CB342; /* Green */
@@ -13,7 +14,7 @@
   margin-bottom: 20px;
   border-radius: 8px;
   box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-  font-family: Arial, sans-serif;
+  font-family: var(--sz-font-family);
   position: fixed; /* Example: make it fixed for visibility during development */
   top: 100px; /* Adjust as needed */
   right: 20px; /* Adjust as needed */
@@ -28,7 +29,7 @@
   margin-bottom: 20px;
   border-radius: 8px;
   box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-  font-family: Arial, sans-serif;
+  font-family: var(--sz-font-family);
   position: fixed;
   top: 100px;
   left: 20px;
@@ -41,11 +42,13 @@
   color: #333;
   font-size: 1.2em;
   margin-bottom: 10px;
+  font-family: var(--sz-font-family);
 }
 
 .strava-zones-content p {
   margin: 5px 0;
   color: #555;
+  font-family: var(--sz-font-family);
 }
 
 .strava-zones-content .zone-row {
@@ -57,6 +60,7 @@
   color: #555;
   margin-bottom: 3px;
   display: block;
+  font-family: var(--sz-font-family);
 }
 
 .strava-zones-content .zone-bar-container {
@@ -69,6 +73,7 @@
   line-height: 20px;
   color: white;
   position: relative;
+  font-family: var(--sz-font-family);
 }
 
 .strava-zones-content .zone-bar {
@@ -89,6 +94,7 @@
     line-height: 20px;
     color: #333;
     font-weight: bold;
+    font-family: var(--sz-font-family);
 }
 
 /* Placeholder for weekly summaries - to be refined */
@@ -97,6 +103,7 @@
   padding: 5px;
   margin-top: 5px;
   font-size: 0.8em;
+  font-family: var(--sz-font-family);
 }
 
 /* Styles for the new weekly summary segmented bars */
@@ -105,12 +112,13 @@
   flex-direction: column; /* Stack zone rows vertically */
   width: 180px; /* Adjust width for a small panel */
   height: auto; /* Height will be determined by content */
-  padding: 5px;
+  padding: 3px;
   background-color: #fafafa;
   border: 1px solid #e0e0e0;
   box-shadow: 0 1px 2px rgba(0,0,0,0.05);
   margin-top: 2px; /* Add some space from the week row content if needed */
   margin-bottom: 2px;
+  font-family: var(--sz-font-family);
 }
 
 .injected-weekly-hr-summary .weekly-zone-row {
@@ -118,12 +126,14 @@
   align-items: center;
   margin-bottom: 2px; /* Space between mini zone rows */
   font-size: 0.7em; /* Smaller font for weekly */
+  font-family: var(--sz-font-family);
 }
 
 .injected-weekly-hr-summary .weekly-zone-label {
   width: 25px; /* Space for 'Z5:', 'Z4:' etc. */
   color: #666;
   flex-shrink: 0;
+  font-family: var(--sz-font-family);
 }
 
 .injected-weekly-hr-summary .weekly-zone-bar-container {
@@ -133,6 +143,7 @@
   height: 10px; /* Tiny bars */
   position: relative;
   margin-right: 5px;
+  font-family: var(--sz-font-family);
 }
 
 .injected-weekly-hr-summary .weekly-zone-bar {
@@ -144,6 +155,7 @@
   font-size: 0.9em; /* Relative to parent .weekly-zone-row */
   color: #777;
   white-space: nowrap;
+  font-family: var(--sz-font-family);
 }
 
 /* Apply zone colors to weekly bars */
@@ -159,3 +171,9 @@
 .injected-weekly-hr-summary .zone-segment.zone3 { background-color: var(--zone3-color); }
 .injected-weekly-hr-summary .zone-segment.zone4 { background-color: var(--zone4-color); }
 .injected-weekly-hr-summary .zone-segment.zone5 { background-color: var(--zone5-color); }
+
+/* If multiple summary cells are somehow added to the same row, only display the first one. */
+/* This is a CSS workaround for the occasional JS duplication issue. */
+tr > td.strava-zones-weekly-summary-cell + td.strava-zones-weekly-summary-cell {
+    display: none !important;
+}

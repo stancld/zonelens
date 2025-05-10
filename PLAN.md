@@ -80,7 +80,7 @@ This file outlines the development steps and serves as a checklist to track prog
     - [ ] Implement JS in options/popup to:
         - [ ] Fetch current settings from `GET /api/zones/settings`.
         - [ ] Send updated settings via `POST /api/zones/settings`.
-- [ ] **Calendar Injection & Data Display**
+- [x] **Calendar Injection & Data Display**
     - [x] Create `content.js`.
     - [x] Implement logic to detect calendar load/navigation.
     - [x] Extract current year/month from the Strava page.
@@ -89,7 +89,7 @@ This file outlines the development steps and serves as a checklist to track prog
     - [x] Identify target locations in the Strava DOM to inject plots.
     - [x] Generate HTML elements for bar plots based on received data.
     - [x] Inject plots into the DOM.
-    - [ ] Create `styles.css` for styling the plots and inject it.
+    - [x] Create `styles.css` for styling the plots and inject it.
 
 ## Phase 5: Refinement
 
