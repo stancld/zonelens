@@ -156,6 +156,7 @@ class ZoneSummary(models.Model):
 		period_type: PeriodType,
 		year: int,
 		period_index: int | None = None,
+		current_month_view: int | None = None,  # Month being viewed, for context
 	) -> tuple[ZoneSummary | None, bool]:
 		"""Tries to fetch a ZoneSummary.
 
@@ -169,53 +170,48 @@ class ZoneSummary(models.Model):
 			defaults={"zone_times_seconds": {}},  # Default to empty if we need to create
 		)
 
-		# Calculate if newly created or if the existing summary's zone_times is empty/default.
-		# This ensures that if an empty summary was somehow created before, it gets populated.
-		if created or not summary.zone_times_seconds or summary.zone_times_seconds == {}:
+		# Always determine activity filters based on current parameters
+		activity_filters = {"user": user_profile, "activity_date__year": year}
+		if period_type == ZoneSummary.PeriodType.MONTHLY:
+			activity_filters["activity_date__month"] = period_index
+		elif period_type == ZoneSummary.PeriodType.WEEKLY:
+			activity_filters["activity_date__week"] = period_index
+			if current_month_view:  # Apply month context if provided for weekly
+				activity_filters["activity_date__month"] = current_month_view
+
+		# Always calculate what the zone times should be based on these filters
+		aggregated_times = (
+			ActivityZoneTimes.objects.filter(**activity_filters)
+			.values("zone_name")
+			.annotate(total_duration=Sum("duration_seconds"))
+			.order_by("zone_name")
+		)
+		calculated_zone_times = {
+			item["zone_name"]: item["total_duration"]
+			for item in aggregated_times
+			if item["total_duration"] and item["total_duration"] > 0
+		}
+
+		# Update and save only if newly created or if calculated times differ from stored times
+		if created or summary.zone_times_seconds != calculated_zone_times:
+			if not calculated_zone_times and not created:
+				# If calculation results in empty and it wasn't just created
+				# (meaning it had data before)
+				# and we now have no data for this specific context, ensure we store empty.
+				pass  # Handled by assignment below
+
+			summary.zone_times_seconds = calculated_zone_times
+			summary.save()
 			logger.info(
 				f"ZoneSummary for {user_profile.strava_id}, {period_type}, {year}-{period_index} "
-				"requires calculation."
+				f"(context: {current_month_view}) updated/created. Data: {calculated_zone_times}"
 			)
-
-			activity_filters = {"user": user_profile, "activity_date__year": year}
-
-			if period_type == ZoneSummary.PeriodType.MONTHLY:
-				activity_filters["activity_date__month"] = period_index
-			elif period_type == ZoneSummary.PeriodType.WEEKLY:
-				# Using 'activity_date__week' for ISO week number (1-53 typically)
-				# Ensure this matches how weeks are defined∂ elsewhere if not ISO 8601 week.
-				activity_filters["activity_date__week"] = period_index
-
-			aggregated_times = (
-				ActivityZoneTimes.objects.filter(**activity_filters)
-				.values("zone_name")
-				.annotate(total_duration=Sum("duration_seconds"))
-				.order_by("zone_name")
+		elif not created:
+			logger.info(
+				f"ZoneSummary for {user_profile.strava_id}, {period_type}, {year}-{period_index} "
+				f"(context: {current_month_view}) fetched. "
+				f"No change in data: {summary.zone_times_seconds}"
 			)
-
-			new_zone_times = {
-				item["zone_name"]: item["total_duration"]
-				for item in aggregated_times
-				if item["total_duration"] and item["total_duration"] > 0
-			}
-
-			if new_zone_times:
-				summary.zone_times_seconds = new_zone_times
-				summary.save()
-				logger.info(
-					f"Calculated and saved ZoneSummary for {user_profile.strava_id}, "
-					f"{period_type}, {year}-{period_index}."
-				)
-			elif created:
-				logger.info(
-					f"No activities found to create ZoneSummary for {user_profile.strava_id}, "
-					f"{period_type}, {year}-{period_index}. Empty summary saved."
-				)
-			else:
-				logger.info(
-					f"No new activity data to update ZoneSummary for {user_profile.strava_id}, "
-					f"{period_type}, {year}-{period_index}."
-				)
 
 		return summary, created
 

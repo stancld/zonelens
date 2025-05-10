@@ -1275,3 +1275,95 @@ class ZoneSummaryViewTests(APITestCase):
 				user=self.strava_user, period_type="WEEKLY", year=2025, period_index=10
 			).exists()
 		)
+
+
+class ZoneSummaryModelTests(TestCase):
+	def setUp(self) -> None:
+		self.user_model = get_user_model()
+		self.django_user = self.user_model.objects.create_user(
+			username="testdjango_user", password="password123"
+		)
+		self.strava_user = StravaUser.objects.create(
+			strava_id=123456,
+			_access_token="test_access_token",
+			_refresh_token="test_refresh_token",
+			token_expires_at=timezone.now() + timedelta(hours=1),
+			user=self.django_user,
+			scope="read,activity:read_all",
+		)
+
+	def test_get_or_create_summary_weekly_with_month_context(self) -> None:
+		# Week 5, 2024 spans January and February
+		# Monday, January 29, 2024 (ISO Week 5)
+		activity_date_jan = datetime(2024, 1, 29, 10, 0, 0, tzinfo=pytz.UTC)
+		# Sunday, February 4, 2024 (ISO Week 5)
+		activity_date_feb = datetime(2024, 2, 4, 10, 0, 0, tzinfo=pytz.UTC)
+
+		iso_year, iso_week_jan, _ = activity_date_jan.isocalendar()
+		iso_year_feb, iso_week_feb, _ = activity_date_feb.isocalendar()
+
+		self.assertEqual(iso_year, 2024)
+		self.assertEqual(iso_week_jan, 5)
+		self.assertEqual(iso_year_feb, 2024)
+		self.assertEqual(iso_week_feb, 5)  # Both should be in week 5
+
+		ActivityZoneTimes.objects.create(
+			user=self.strava_user,
+			activity_id=1,
+			zone_name="Z1 Jan",
+			duration_seconds=100,
+			activity_date=activity_date_jan,
+		)
+		ActivityZoneTimes.objects.create(
+			user=self.strava_user,
+			activity_id=2,
+			zone_name="Z1 Feb",
+			duration_seconds=200,
+			activity_date=activity_date_feb,
+		)
+
+		# Test for January context (Week 5 of 2024, only January activities)
+		summary_jan_context, created_jan = ZoneSummary.get_or_create_summary(
+			user_profile=self.strava_user,
+			period_type=ZoneSummary.PeriodType.WEEKLY,  # type: ignore[arg-type]
+			year=iso_year,  # Should be 2024
+			period_index=iso_week_jan,  # Should be 5
+			current_month_view=1,  # January
+		)
+		self.assertTrue(created_jan)
+		self.assertIsNotNone(summary_jan_context)
+		if summary_jan_context:
+			self.assertEqual(summary_jan_context.zone_times_seconds, {"Z1 Jan": 100})
+
+		# Test for February context (Week 5 of 2024, only February activities)
+		# This call should GET the previously created summary object for week 5, 2024
+		# and then RECALCULATE its zone_times_seconds based on the new February context.
+		summary_feb_context, created_feb = ZoneSummary.get_or_create_summary(
+			user_profile=self.strava_user,
+			period_type=ZoneSummary.PeriodType.WEEKLY,  # type: ignore[arg-type]
+			year=iso_year,  # Should be 2024
+			period_index=iso_week_feb,  # Should be 5
+			current_month_view=2,  # February
+		)
+		self.assertFalse(created_feb, "Second call for same period should fetch, not create.")
+		self.assertIsNotNone(summary_feb_context)
+		if summary_feb_context:
+			self.assertEqual(summary_feb_context.zone_times_seconds, {"Z1 Feb": 200})
+			# Ensure it's the same DB object that was updated
+			self.assertEqual(summary_jan_context.pk, summary_feb_context.pk)  # type: ignore[union-attr]
+
+		# Final check: what if no month context is given for that week?
+		# It should again GET the same summary object and RECALCULATE it to sum both activities.
+		summary_no_context, created_no_context = ZoneSummary.get_or_create_summary(
+			user_profile=self.strava_user,
+			period_type=ZoneSummary.PeriodType.WEEKLY,  # type: ignore[arg-type]
+			year=iso_year,
+			period_index=iso_week_jan,
+			current_month_view=None,  # No specific month context
+		)
+		self.assertFalse(created_no_context, "Third call for same period should also fetch.")
+		self.assertIsNotNone(summary_no_context)
+		if summary_no_context:
+			self.assertEqual(summary_no_context.zone_times_seconds, {"Z1 Jan": 100, "Z1 Feb": 200})
+			# Ensure it's still the same DB object
+			self.assertEqual(summary_jan_context.pk, summary_no_context.pk)  # type: ignore[union-attr]

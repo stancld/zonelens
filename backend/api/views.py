@@ -298,6 +298,7 @@ class ZoneSummaryView(APIView):
 				period_type=ZoneSummary.PeriodType.WEEKLY,  # type: ignore[arg-type]
 				year=year,
 				period_index=week,
+				current_month_view=month,
 			)
 			if weekly_summary_qs:
 				weekly_summaries.append(weekly_summary_qs)
