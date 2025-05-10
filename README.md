@@ -19,9 +19,9 @@ The main aim is to provide a visual representation of time spent in different HR
 
 This is an **experimental project** primarily developed as an exercise in **"vibe-coding"** – rapidly iterating and building features with a focus on learning and exploration rather than achieving maximum efficiency or a production-ready state. As such, some design choices or implementation details might reflect this learning process.
 
-## 📸 Current State (as of May 9, 2025)
+## 📸 Current State (as of May 10, 2025)
 
-![Current WIP Screenshot](images/wip_250509.png)
+![Current WIP Screenshot](images/wip_250510.png)
 
 ## Core Features
 
