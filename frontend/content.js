@@ -191,7 +191,7 @@ function renderWeeklySummaries(monthKey, data) {
   console.log(`Processed ${weekRows.length} potential week rows for weekly summaries.`);
 }
 
-function clearSummary() {
+function clearAllInjectedUI() {
   const monthlyElement = document.getElementById(MONTHLY_SUMMARY_ID);
   if (monthlyElement) {
     monthlyElement.remove();
@@ -206,33 +206,58 @@ function clearSummary() {
 }
 
 function initHrZoneDisplay() {
-  const currentHash = window.location.hash; // e.g., "#Feb"
-  const monthKey = currentHash.startsWith('#') ? currentHash.substring(1) : null;
+  const currentPath = window.location.pathname; // e.g., /athlete/calendar/2024
+  const currentHash = window.location.hash;    // e.g., "#Jul"
+
+  // Extract month key from hash (e.g., "Jul" from "#Jul" or "#Jul-2024")
+  const monthKey = currentHash.startsWith('#') ? currentHash.substring(1, 4) : null;
 
   // Simple check for 3-letter month abbreviations
   if (monthKey && /^[A-Za-z]{3}$/.test(monthKey)) {
     console.log(`Attempting to display HR Zones for month: ${monthKey}`);
-    clearSummary(); // Clear previous summaries
+    clearAllInjectedUI(); // Use the updated clearing function
 
-    // Determine year (e.g., from Strava page, or assume current year)
-    // For now, let's try to get it from a Strava element, otherwise default to current year.
-    let year = new Date().getFullYear();
-    const yearElement = document.querySelector('.selected-month .year'); // Example selector, might need adjustment
-    if (yearElement && yearElement.textContent) {
-        const parsedYear = parseInt(yearElement.textContent.trim(), 10);
-        if (!isNaN(parsedYear)) {
-            year = parsedYear;
-        }
+    let yearToUse = null;
+
+    // 1. Try to extract year from pathname
+    const pathParts = currentPath.split('/');
+    // Expected: /athlete/calendar/YYYY or /athletes/NNNNN/calendar/YYYY
+    const calendarKeywordIndex = pathParts.indexOf('calendar');
+    if (calendarKeywordIndex !== -1 && pathParts.length > calendarKeywordIndex + 1) {
+      const yearStr = pathParts[calendarKeywordIndex + 1];
+      if (/^\d{4}$/.test(yearStr)) {
+        yearToUse = parseInt(yearStr, 10);
+        console.log(`Year extracted from path: ${yearToUse}`);
+      }
     }
-    console.log(`Using year: ${year} for month: ${monthKey}`);
 
-    fetchActivityData(year, monthKey).then(data => {
+    // 2. If not in path, try from DOM element
+    if (!yearToUse) {
+      const yearElement = document.querySelector('.selected-month .year'); // Selector from original snippet
+      if (yearElement && yearElement.textContent) {
+          const parsedYear = parseInt(yearElement.textContent.trim(), 10);
+          if (!isNaN(parsedYear)) {
+              yearToUse = parsedYear;
+              console.log(`Year extracted from DOM: ${yearToUse}`);
+          }
+      }
+    }
+
+    // 3. If still no year, default to current year
+    if (!yearToUse) {
+      yearToUse = new Date().getFullYear();
+      console.log(`Year defaulted to current system year: ${yearToUse}`);
+    }
+
+    console.log(`Using year: ${yearToUse} for month: ${monthKey}`);
+
+    fetchActivityData(yearToUse, monthKey).then(data => {
       // Check if monthly_summary and its zone_times_seconds exist and are not empty
       if (data && data.monthly_summary && data.monthly_summary.zone_times_seconds && Object.keys(data.monthly_summary.zone_times_seconds).length > 0) { // Check if data is valid
         // Ensure data.displayName and data.zoneDefinitions are present, or have fallbacks
         const displayData = {
             displayName: monthMap[monthKey] || monthKey, // Use monthMap, as data.displayName is not from API
-            year: data.year || year,
+            year: data.year || yearToUse,
             totalSummary: data.monthly_summary.zone_times_seconds, // Correct path to zone times
             // Use fetched zoneDefinitions, or a static fallback if not provided
             zoneDefinitions: { // data.zoneDefinitions is not from API, using fallback
@@ -243,20 +268,20 @@ function initHrZoneDisplay() {
         renderMonthlySummary(monthKey, displayData);
         renderWeeklySummaries(monthKey, displayData);
       } else {
-        console.warn(`No valid data received for ${monthMap[monthKey] || monthKey}, ${year} or error in fetching. Monthly summary was:`, data ? data.monthly_summary : 'no data');
+        console.warn(`No valid data received for ${monthMap[monthKey] || monthKey}, ${yearToUse} or error in fetching. Monthly summary was:`, data ? data.monthly_summary : 'no data');
         // Display a message indicating no data or an error
         const summaryContainer = document.getElementById(MONTHLY_SUMMARY_ID) || document.createElement('div');
         if (!summaryContainer.id) {
             summaryContainer.id = MONTHLY_SUMMARY_ID;
             document.body.prepend(summaryContainer);
         }
-        summaryContainer.innerHTML = `<div class="strava-zones-header"><h3>Data for ${monthMap[monthKey] || monthKey} ${year} not available.</h3></div>`;
+        summaryContainer.innerHTML = `<div class="strava-zones-header"><h3>Data for ${monthMap[monthKey] || monthKey} ${yearToUse} not available.</h3></div>`;
       }
     });
 
   } else {
     console.log("Not on a specific month view, clearing summary.", monthKey);
-    clearSummary();
+    clearAllInjectedUI();
   }
 }
 
