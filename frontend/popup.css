@@ -48,8 +48,13 @@ button {
   font-size: 14px;
   cursor: pointer;
   transition: background-color 0.2s ease-in-out;
-  width: 100%;
+  width: 100%; /* Restore full width */
   box-sizing: border-box;
+  margin-bottom: 10px; /* Add space below each button */
+}
+
+.button-container button:last-child {
+  margin-bottom: 0;
 }
 
 button:hover {

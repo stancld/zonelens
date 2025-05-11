@@ -48,6 +48,7 @@ document.addEventListener('DOMContentLoaded', function() {
     if (loginButton) {
         loginButton.addEventListener('click', function() {
             statusMessage.textContent = ''; // Clear previous messages
+            // Redirect to your backend's Strava authorization initiate URL
             chrome.tabs.create({ url: `${API_BASE_URL}/auth/strava` });
         });
     }

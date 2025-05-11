@@ -71,7 +71,7 @@ This file outlines the development steps and serves as a checklist to track prog
     - [x] Create simple `popup.html` and `popup.js`.
     - [x] Implement CSRF token handling for backend requests from extension (`settings.py`, `popup.js`).
     - [x] Configure local HTTPS development environment (`mkcert`, Django dev server settings).
-    - [ ] Add button/link in popup to initiate auth (redirects to backend `/api/auth/strava`).
+    - [x] Add button/link in popup to initiate auth (redirects to backend `/api/auth/strava`).
     - [ ] Create `background.js` to handle potential message passing.
     - [ ] Implement logic to store/manage backend session/token in `chrome.storage.local` after successful auth callback.
 - [ ] **Custom Zone UI**
