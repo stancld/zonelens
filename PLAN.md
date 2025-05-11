@@ -53,7 +53,7 @@ This file outlines the development steps and serves as a checklist to track prog
 
 - [x] **Zone Data API Endpoint**
     - [x] Implement `GET /api/zones?year=YYYY&month=MM` view.
-    - [ ] Add authentication/permission checks (user must be logged in).
+    - [x] Add authentication/permission checks (user must be logged in).
     - [x] Retrieve relevant weekly/monthly `ZoneSummary` data from DB for the user/period.
     - [x] Add URL pattern for the zones data view.
     - [x] Add serializer (DRF) for `ZoneSummary`.
