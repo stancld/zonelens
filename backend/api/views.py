@@ -85,7 +85,10 @@ def strava_callback(request: HttpRequest) -> HttpResponse:
 		token_data = response.json()
 
 		athlete_info = token_data.get("athlete", {})
+		# Brave browser returns id as a tuple
 		strava_id = athlete_info.get("id")
+		if isinstance(strava_id, tuple):
+			strava_id = strava_id[0]
 
 		if not strava_id:
 			logger.error("Strava ID not found in token response.")
