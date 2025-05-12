@@ -17,6 +17,7 @@ import os
 from pathlib import Path
 
 import dotenv
+from cryptography.fernet import Fernet
 
 # Configure basic logging
 logging.basicConfig(
@@ -212,9 +213,13 @@ SESSION_COOKIE_SAMESITE = "None"  # Allow sending cookie on cross-site requests
 SESSION_COOKIE_SECURE = True
 
 # Fernet encryption settings for token storage
-FERNET_KEY = os.getenv("FERNET_KEY")
-if not FERNET_KEY:
-	logger.critical("FERNET_KEY environment variable is not set. Encryption will fail.")
+
+if not (FERNET_KEY := os.getenv("FERNET_KEY")):
+	raise ValueError("FERNET_KEY environment variable is not set. Encryption will fail.")
+try:
+	Fernet(FERNET_KEY.encode())
+except ValueError as e:
+	raise ValueError("FERNET_KEY environment variable is not a valid Fernet key.") from e
 
 # Strava API credentials
 STRAVA_CLIENT_ID = os.getenv("STRAVA_CLIENT_ID")
