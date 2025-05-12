@@ -123,6 +123,7 @@ def _get_user(
 			"first_name": athlete_info.get("firstname", ""),
 			"last_name": athlete_info.get("lastname", ""),
 			"email": athlete_info.get("email", ""),
+			"last_login": timezone.now(),
 		},
 	)
 
