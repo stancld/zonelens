@@ -2,8 +2,8 @@
 
 API_TOKEN=$1
 
-curl -X POST \
-  http://127.0.0.1:8000/api/settings/custom-zones/ \
+curl -k -X POST \
+  https://127.0.0.1:8000/api/settings/custom-zones/ \
   -H "Authorization: Token $API_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
