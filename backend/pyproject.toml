@@ -20,7 +20,8 @@ dependencies = [
     "pytz",
     "django-cors-headers",
     "django-extensions",
-    "werkzeug"
+    "werkzeug",
+    "pyOpenSSL",
 ]
 
 [project.optional-dependencies]
