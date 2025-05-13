@@ -85,6 +85,8 @@ LLMs often introduce unnecessary complexity. Stay focused on core functionality 
 
 When working with LLMs (e.g., Gemini 2.5 Pro, Claude 3 Sonnet) on intricate code modifications, such as adjusting specific filter conditions within a complex method, they may sometimes propose larger-scale refactors rather than small, surgical changes. These expansive refactors can often be perplexing, creating unnecessary mess and potentially breaking existing functionality. For such fine-grained adjustments, it is frequently more effective to leverage one's own coding expertise to make the precise change, or to guide the LLM with very specific, constrained instructions. This highlights the importance of human oversight and a critical approach when pair-programming with AI, especially for delicate modifications in an existing codebase.
 
+**Django Forms and LLMs:** Generating well-functioning Django forms with LLMs can be particularly frustrating. It usually leads to breaking a ton of stuff and circulating in a vicious circle. This highlights a specific area where LLM assistance requires extreme caution and often more manual intervention.
+
 ## Final Thoughts
 Effective LLM-assisted development is a skill — one that improves with experience. By applying structured workflows, clear communication, and a collaborative mindset, you can get the most out of tools like Claude Sonnet, Gemini, and Windsurf.
 
