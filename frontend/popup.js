@@ -113,13 +113,67 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     // --- End HR Zones Check ---
 
-    if (fetchHrZonesButton) { // Added this block
-        fetchHrZonesButton.addEventListener('click', function() {
-            statusMessage.textContent = ''; // Clear previous messages
-            console.log('"Fetch HR Zones" button clicked. (No-op for now)');
-            updateStatus('"Fetch HR Zones" button clicked. (Functionality not yet implemented)', 'info');
-            // TODO: Implement actual HR zone fetching logic here
-            // After fetching, potentially call updateSyncButtonState() again
+    async function fetchAndStoreStravaHrZones() {
+        updateStatus('Attempting to fetch HR zones from Strava...', 'info');
+        const backendOrigin = 'https://localhost:8000';
+        try {
+            const csrftoken = await getCookie('csrftoken', backendOrigin);
+            if (!csrftoken) {
+                updateStatus('Error: CSRF token not found. Please log in.', 'error');
+                return false;
+            }
+
+            const response = await fetch(`${API_BASE_URL}/fetch-strava-hr-zones/`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': csrftoken
+                },
+                credentials: 'include'
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                updateStatus(data.message || 'HR zones fetched successfully from Strava.', 'success');
+                return true;
+            } else {
+                const errorData = await response.json().catch(() => ({ error: 'Failed to parse error from HR zone fetch.' }));
+                updateStatus(`Error fetching HR zones: ${errorData.error || response.statusText}`, 'error');
+                return false;
+            }
+        } catch (error) {
+            console.error('Error in fetchAndStoreStravaHrZones:', error);
+            updateStatus(`Request to fetch HR zones failed: ${error.message || error.toString()}`, 'error');
+            return false;
+        }
+    }
+
+    if (fetchHrZonesButton) {
+        fetchHrZonesButton.addEventListener('click', async function() {
+            updateStatus('Checking HR zone status...', 'info');
+            const zonesAlreadyAvailable = await checkHrZonesAvailability(); // This updates status if it fails
+
+            if (zonesAlreadyAvailable) {
+                updateStatus('HR zones are already available.', 'info');
+                await updateSyncButtonState(); // Ensure sync button state is correct
+                return;
+            }
+
+            // Zones not available (or checkHrZonesAvailability failed and returned false)
+            // If checkHrZonesAvailability failed, it would have set an error message.
+            // If it returned false because no zones, then we proceed to fetch.
+            if (statusMessage.classList.contains('status-error')) {
+                // If checkHrZonesAvailability already set an error, don't overwrite it immediately by saying "fetching..."
+                // But still, let's ensure the sync button state is updated based on this failure.
+                await updateSyncButtonState();
+                return;
+            }
+
+            updateStatus('HR zones not found. Attempting to fetch from Strava...', 'info');
+            await fetchAndStoreStravaHrZones(); // This function updates status on its own outcome
+
+            // After attempting to fetch, update the sync button state based on the new reality
+            await updateSyncButtonState();
         });
     }
 

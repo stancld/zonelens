@@ -350,3 +350,47 @@ class UserHRZoneStatusView(APIView):
 
 		has_zones = HeartRateZone.objects.filter(config__user=user_profile).exists()
 		return Response({"has_hr_zones": has_zones}, status=status.HTTP_200_OK)
+
+
+class FetchStravaHRZonesView(APIView):
+	"""View to trigger fetching and storing of Strava HR zones for the authenticated user."""
+
+	permission_classes = [IsAuthenticated]
+
+	def post(self, request: Request) -> Response:
+		user = request.user
+		try:
+			user_strava_profile = user.strava_profile
+		except StravaUser.DoesNotExist:
+			logger.warning(
+				f"Strava profile not found for Django user {user.username} (ID: {user.id})."
+			)
+			return Response(
+				{"error": "Strava account not linked or profile missing."},
+				status=status.HTTP_404_NOT_FOUND,
+			)
+
+		try:
+			worker = StravaHRWorker(user_strava_id=user_strava_profile.strava_id)
+			success = worker.fetch_and_store_strava_hr_zones()
+
+			if success:
+				# The worker logs specifics. Here, just confirm the operation.
+				return Response(
+					{"message": "Strava HR zones fetch process completed."},
+					status=status.HTTP_200_OK,
+				)
+			# This case implies a handled failure within the worker, e.g., API error.
+			# The worker should have logged the specific reason.
+			return Response(
+				{"error": "Failed to fetch Strava HR zones. See server logs for details."},
+				status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+			)
+		except Exception as e:
+			logger.exception(
+				f"Error fetching Strava HR zones for user {user_strava_profile.strava_id}: {e}"
+			)
+			return Response(
+				{"error": "An unexpected error occurred while fetching HR zones."},
+				status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+			)
