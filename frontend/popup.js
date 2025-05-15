@@ -40,10 +40,88 @@ async function getCookie(name, url) {
 document.addEventListener('DOMContentLoaded', function() {
     const loginButton = document.getElementById('loginButton');
     const syncButton = document.getElementById('syncButton');
+    const fetchHrZonesButton = document.getElementById('fetchHrZonesButton'); // Added this line
     const afterDateInput = document.getElementById('afterDate');
     const statusMessage = document.getElementById('statusMessage');
 
     const API_BASE_URL = 'https://localhost:8000/api'; // Ensure this matches your backend
+
+    // Function to update status message and apply class (moved to higher scope)
+    function updateStatus(message, type) {
+        statusMessage.textContent = message;
+        statusMessage.className = ''; // Clear existing classes
+        if (type === 'success') {
+            statusMessage.classList.add('status-success');
+        } else if (type === 'error') {
+            statusMessage.classList.add('status-error');
+        } else if (type === 'info') {
+            statusMessage.classList.add('status-info');
+        } else {
+            statusMessage.textContent = message; // Default, no class
+        }
+    }
+
+    // --- HR Zones Check ---
+    async function checkHrZonesAvailability() {
+        console.log('Checking HR zone availability from backend...');
+        const backendOrigin = 'https://localhost:8000'; // Define base origin
+        try {
+            const csrftoken = await getCookie('csrftoken', backendOrigin);
+            if (!csrftoken) {
+                console.error('CSRF token not found for HR zone check.');
+                updateStatus('Error: CSRF token not found. Please log in to the backend.', 'error');
+                return false;
+            }
+
+            const response = await fetch(`${API_BASE_URL}/user/hr-zone-status/`, {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': csrftoken
+                },
+                credentials: 'include'
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                console.log('HR zone status from backend:', data);
+                return data.has_hr_zones;
+            } else {
+                const errorData = await response.text();
+                console.error('Failed to fetch HR zone status:', response.status, errorData);
+                updateStatus(`Error checking HR zones: ${response.status}`, 'error');
+                return false;
+            }
+        } catch (error) {
+            console.error('Error during checkHrZonesAvailability:', error);
+            updateStatus('Failed to connect to backend for HR zone check.', 'error');
+            return false;
+        }
+    }
+
+    async function updateSyncButtonState() {
+        const hrZonesAvailable = await checkHrZonesAvailability();
+        if (syncButton) {
+            if (hrZonesAvailable) {
+                syncButton.disabled = false;
+                syncButton.title = 'Sync your Strava activities.';
+            } else {
+                syncButton.disabled = true;
+                syncButton.title = 'Please fetch HR zones first.';
+            }
+        }
+    }
+    // --- End HR Zones Check ---
+
+    if (fetchHrZonesButton) { // Added this block
+        fetchHrZonesButton.addEventListener('click', function() {
+            statusMessage.textContent = ''; // Clear previous messages
+            console.log('"Fetch HR Zones" button clicked. (No-op for now)');
+            updateStatus('"Fetch HR Zones" button clicked. (Functionality not yet implemented)', 'info');
+            // TODO: Implement actual HR zone fetching logic here
+            // After fetching, potentially call updateSyncButtonState() again
+        });
+    }
 
     if (loginButton) {
         loginButton.addEventListener('click', function() {
@@ -54,20 +132,6 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     if (syncButton) {
-        // Function to update status message and apply class
-        function updateStatus(message, type) {
-            statusMessage.textContent = message;
-            statusMessage.className = ''; // Clear existing classes
-            if (type === 'success') {
-                statusMessage.classList.add('status-success');
-            } else if (type === 'error') {
-                statusMessage.classList.add('status-error');
-            } else if (type === 'info') {
-                statusMessage.classList.add('status-info');
-            } else {
-                statusMessage.textContent = message; // Default, no class
-            }
-        }
 
         syncButton.addEventListener('click', async function() {
             syncButton.disabled = true;
@@ -118,4 +182,7 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     }
+
+    // Initial state update for sync button based on HR zones
+    updateSyncButtonState();
 });

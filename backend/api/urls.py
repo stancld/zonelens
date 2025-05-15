@@ -23,4 +23,9 @@ urlpatterns = [
 		views.ZoneSummaryView.as_view(),
 		name="zone_summary",
 	),
+	path(
+		"user/hr-zone-status/",
+		views.UserHRZoneStatusView.as_view(),
+		name="user_hr_zone_status",
+	),
 ]

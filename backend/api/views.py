@@ -24,7 +24,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from api.models import CustomZonesConfig, StravaUser, ZoneSummary
+from api.models import CustomZonesConfig, HeartRateZone, StravaUser, ZoneSummary
 from api.serializers import CustomZonesConfigSerializer, ZoneSummarySerializer
 from api.utils import encrypt_data
 from api.worker import StravaHRWorker
@@ -333,3 +333,20 @@ class ZoneSummaryView(APIView):
 						weeks_in_month.append(iso_week)
 					break
 		return weeks_in_month
+
+
+class UserHRZoneStatusView(APIView):
+	"""Check if the authenticated user has any HR zones defined."""
+
+	permission_classes = [IsAuthenticated]
+
+	def get(self, request: Request) -> Response:
+		user_profile = request.user.strava_profile
+		if not user_profile:
+			return Response(
+				{"has_hr_zones": False, "error": "Strava profile not found for user."},
+				status=status.HTTP_404_NOT_FOUND,
+			)
+
+		has_zones = HeartRateZone.objects.filter(config__user=user_profile).exists()
+		return Response({"has_hr_zones": has_zones}, status=status.HTTP_200_OK)
