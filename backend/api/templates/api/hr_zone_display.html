@@ -157,7 +157,13 @@ nav {
             <h2>Configuration: {% if custom_zones_config.config_name %}{{ custom_zones_config.config_name }} - {% endif %}{{ custom_zones_config.get_activity_type_display|default:custom_zones_config.activity_type }}</h2>
 
             {% if hr_zones %}
-                <h3>Heart Rate Zones:</h3>
+                <form id="hrZoneForm" method="POST">
+                    {% csrf_token %}
+                    {% if custom_zones_config %}
+                    <input type="hidden" id="config_id" name="config_id" value="{{ custom_zones_config.id }}">
+                    <input type="hidden" id="activity_type" name="activity_type" value="{{ custom_zones_config.activity_type }}">
+                    {% endif %}
+                    <h3>Heart Rate Zones:</h3>
                 <table class="hr-zones-table">
                     <thead>
                         <tr>
@@ -166,30 +172,33 @@ nav {
                             <th>Max HR (bpm)</th>
                         </tr>
                     </thead>
-                    <tbody>
+                    <tbody id="hrZonesTableBody">
                         {% for zone in hr_zones %}
-                        <tr class="zone-row zone-{{ forloop.counter }}">
-                            <td>{{ zone.name }}</td> {# Use name field #}
+                        <tr class="zone-row zone-{{ forloop.counter }}" data-zone-order="{{ forloop.counter }}">
                             <td>
-                                {% if zone.min_hr == 0 %}
-                                    {# Don't display 0 #}
-                                {% else %}
-                                    {{ zone.min_hr }}
-                                {% endif %}
+                                <input type="text" name="zone_name_{{ forloop.counter }}" value="{{ zone.name }}" class="zone-name-input" style="width:120px; padding: 6px; border: 1px solid #ccc; border-radius: 4px;" required>
+                                <input type="hidden" name="zone_order_{{ forloop.counter }}" value="{{ forloop.counter }}">
                             </td>
                             <td>
-                                {% if zone.max_hr == 999 %}
-                                    {# Don't display 999 #}
-                                {% elif zone.max_hr is not None %}
-                                    {{ zone.max_hr }}
-                                {% else %}
-                                    &infin;
-                                {% endif %}
+                                <span id="min-hr-display-{{ forloop.counter }}" class="min-hr-display" style="padding: 6px;">
+                                    {% if forloop.first %}0{% else %}{{ zone.min_hr }}{% endif %}
+                                </span>
+                                <input type="hidden" id="zone_min_hr_input_{{ forloop.counter }}" name="zone_min_hr_{{ forloop.counter }}" value="{% if forloop.first %}0{% else %}{{ zone.min_hr }}{% endif %}">
+                            </td>
+                            <td>
+                                <input type="number" name="zone_max_hr_{{ forloop.counter }}" class="zone-max-hr-input" style="width:100px; padding: 6px; border: 1px solid #ccc; border-radius: 4px;"
+                                       value="{% if zone.max_hr and zone.max_hr != 0 and zone.max_hr != 999 %}{{ zone.max_hr }}{% endif %}"
+                                       placeholder="{% if zone.max_hr == 999 %}e.g. 220{% elif not zone.max_hr or zone.max_hr == 0 %}e.g. 120{% endif %}"
+                                       min="1">
                             </td>
                         </tr>
                         {% endfor %}
                     </tbody>
                 </table>
+                <div style="margin-top: 20px; margin-bottom: 15px;">
+                    <button type="submit" id="saveHrZonesButton" class="strava-button">Save Changes</button>
+                </div>
+                </form>
             {% else %}
                 <p class="info-message">No heart rate zones are defined for the '{{ custom_zones_config.config_name }}' configuration.</p>
             {% endif %}
@@ -206,6 +215,169 @@ nav {
     </div>
 
 <script>
+document.addEventListener('DOMContentLoaded', function () {
+    const form = document.getElementById('hrZoneForm');
+    // const saveButton = document.getElementById('saveHrZonesButton'); // Not directly used, event is on form submit
+    const statusMessageDiv = document.getElementById('fetchStatusMessage');
+    const configIdInput = document.getElementById('config_id');
+    const activityTypeInput = document.getElementById('activity_type');
+    const tableBody = document.getElementById('hrZonesTableBody');
+
+    if (!form || !tableBody) {
+        return;
+    }
+
+    const zoneRows = tableBody.querySelectorAll('tr');
+
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+    const csrftoken = getCookie('csrftoken');
+
+    zoneRows.forEach((row) => {
+        const maxHrInput = row.querySelector('.zone-max-hr-input');
+        if (maxHrInput) {
+            maxHrInput.addEventListener('input', function () {
+                const currentZoneOrder = parseInt(row.dataset.zoneOrder);
+                const nextZoneOrder = currentZoneOrder + 1;
+                const nextZoneRow = tableBody.querySelector(`tr[data-zone-order="${nextZoneOrder}"]`);
+
+                if (nextZoneRow) {
+                    const nextMinHrDisplay = nextZoneRow.querySelector('.min-hr-display');
+                    const nextMinHrInput = nextZoneRow.querySelector('input[name^="zone_min_hr_"]');
+                    let newMinHr = parseInt(this.value);
+                    if (isNaN(newMinHr) || newMinHr < 0) newMinHr = 0; // Default to 0 if invalid
+
+                    nextMinHrDisplay.textContent = newMinHr;
+                    nextMinHrInput.value = newMinHr;
+                }
+            });
+        }
+    });
+
+    form.addEventListener('submit', function (event) {
+        event.preventDefault();
+        statusMessageDiv.textContent = 'Saving...';
+        statusMessageDiv.className = 'info-message';
+
+        const configId = configIdInput ? configIdInput.value : null;
+        const activityType = activityTypeInput ? activityTypeInput.value : 'DEFAULT';
+
+        if (!configId) {
+            statusMessageDiv.textContent = 'Error: Configuration ID is missing.';
+            statusMessageDiv.className = 'error-message';
+            return;
+        }
+
+        const zonesDefinition = [];
+        let overallIsValid = true;
+        let previousMaxHr = 0; // Min HR for Zone 1 is 0.
+
+        for (const row of zoneRows) {
+            const order = parseInt(row.dataset.zoneOrder);
+            const nameInput = row.querySelector('.zone-name-input');
+            const maxHrInput = row.querySelector('.zone-max-hr-input');
+
+            const name = nameInput.value.trim();
+            const max_hr_string = maxHrInput.value.trim();
+            const max_hr = parseInt(max_hr_string);
+
+            let min_hr = (order === 1) ? 0 : previousMaxHr;
+
+            if (!name) {
+                statusMessageDiv.textContent = `Error: Zone ${order} name cannot be empty.`;
+                overallIsValid = false;
+                break;
+            }
+            if (max_hr_string === '' || isNaN(max_hr) || max_hr <= 0) {
+                 statusMessageDiv.textContent = `Error: Zone ${order} Max HR must be a positive number.`;
+                 overallIsValid = false;
+                 break;
+            }
+            if (max_hr <= min_hr) {
+                statusMessageDiv.textContent = `Error: Zone ${order} Max HR (${max_hr}) must be greater than its Min HR (${min_hr}).`;
+                overallIsValid = false;
+                break;
+            }
+
+            zonesDefinition.push({
+                name: name,
+                min_hr: min_hr,
+                max_hr: max_hr,
+                order: order
+            });
+            previousMaxHr = max_hr;
+        }
+
+        if (!overallIsValid) {
+            statusMessageDiv.className = 'error-message';
+            return;
+        }
+
+        const payload = {
+            activity_type: activityType,
+            zones_definition: zonesDefinition
+        };
+
+        fetch(`/api/settings/custom-zones/${configId}/`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': csrftoken
+            },
+            body: JSON.stringify(payload)
+        })
+        .then(response => {
+            if (!response.ok) {
+                 return response.json().then(errData => {
+                    let errorMsg = 'Error saving zones.';
+                    if (errData) {
+                        const messages = [];
+                        for (const key in errData) {
+                            if (Array.isArray(errData[key])) {
+                                errData[key].forEach(msg => {
+                                    if (typeof msg === 'string') messages.push(`${key}: ${msg}`);
+                                    else if (typeof msg === 'object' && msg.detail) messages.push(`${key}: ${msg.detail}`);
+                                    else if (typeof msg === 'object') messages.push(`${key}: ${JSON.stringify(msg)}`);
+                                });
+                            } else {
+                                messages.push(`${key}: ${errData[key]}`);
+                            }
+                        }
+                        if (messages.length > 0) errorMsg = messages.join('; ');
+                    }
+                    throw new Error(errorMsg);
+                });
+            }
+            return response.json();
+        })
+        .then(data => {
+            statusMessageDiv.textContent = 'Heart rate zones saved successfully!';
+            statusMessageDiv.className = 'success-message';
+            // Consider refreshing zone values from `data` if backend modifies/cleans them
+            // For simplicity, a page refresh after successful save would also show new state.
+            // location.reload(); // Uncomment to reload page on success
+        })
+        .catch(error => {
+            statusMessageDiv.textContent = error.message || 'Error saving zones. Please try again.';
+            statusMessageDiv.className = 'error-message';
+        });
+    });
+});
+</script>
+
+<script>
 document.addEventListener('DOMContentLoaded', function() {
     const fetchButton = document.getElementById('fetchStravaHrZonesButton');
     const statusMessageDiv = document.getElementById('fetchStatusMessage');
@@ -214,6 +386,18 @@ document.addEventListener('DOMContentLoaded', function() {
 
     if (fetchButton) {
         fetchButton.addEventListener('click', function() {
+            // Check if a custom config exists (passed from Django template)
+            const customConfigId = "{{ custom_zones_config.id|default:'' }}"; // Get config ID, default to empty string if not set
+
+            if (customConfigId) { // If there's a config ID, it means a config exists that might be overwritten
+                const userConfirmed = confirm("Fetching new zones from Strava will override your current custom settings and any unsaved changes will also be lost. Are you sure you want to proceed?");
+                if (!userConfirmed) {
+                    statusMessageDiv.textContent = 'Operation cancelled by user.';
+                    statusMessageDiv.className = 'info-message'; // Use existing styles
+                    return; // Abort if user cancels
+                }
+            }
+
             statusMessageDiv.textContent = 'Fetching HR zones from Strava...';
             statusMessageDiv.className = 'info-message'; // Use existing styles
             fetchButton.disabled = true;
