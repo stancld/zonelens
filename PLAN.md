@@ -77,9 +77,8 @@ This file outlines the development steps and serves as a checklist to track prog
 - [ ] **Custom Zone UI**
     - [ ] Create an options page (`options.html`, `options.js`) or enhance the popup UI.
     - [ ] Add form elements to define zone boundaries per activity type.
-    - [ ] Implement JS in options/popup to:
-        - [ ] Fetch current settings from `GET /api/zones/settings`.
-        - [ ] Send updated settings via `POST /api/zones/settings`.
+    - [x] Implement JS in options/popup to:
+        - [x] Fetch current settings from `GET /api/zones/settings`.
 - [x] **Calendar Injection & Data Display**
     - [x] Create `content.js`.
     - [x] Implement logic to detect calendar load/navigation.

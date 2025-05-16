@@ -17,6 +17,7 @@ from django.http import (
 )
 from django.shortcuts import render
 from django.utils import timezone
+from django.views.generic import TemplateView
 from rest_framework import generics, status
 from rest_framework.authtoken.models import Token
 from rest_framework.decorators import api_view, permission_classes
@@ -24,7 +25,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from api.models import CustomZonesConfig, StravaUser, ZoneSummary
+from api.models import ActivityType, CustomZonesConfig, HeartRateZone, StravaUser, ZoneSummary
 from api.serializers import CustomZonesConfigSerializer, ZoneSummarySerializer
 from api.utils import encrypt_data
 from api.worker import StravaHRWorker
@@ -333,3 +334,106 @@ class ZoneSummaryView(APIView):
 						weeks_in_month.append(iso_week)
 					break
 		return weeks_in_month
+
+
+class UserHRZoneStatusView(APIView):
+	"""Check if the authenticated user has any HR zones defined."""
+
+	permission_classes = [IsAuthenticated]
+
+	def get(self, request: Request) -> Response:
+		user_profile = request.user.strava_profile
+		if not user_profile:
+			return Response(
+				{"has_hr_zones": False, "error": "Strava profile not found for user."},
+				status=status.HTTP_404_NOT_FOUND,
+			)
+
+		has_zones = HeartRateZone.objects.filter(config__user=user_profile).exists()
+		return Response({"has_hr_zones": has_zones}, status=status.HTTP_200_OK)
+
+
+class FetchStravaHRZonesView(APIView):
+	"""View to trigger fetching and storing of Strava HR zones for the authenticated user."""
+
+	permission_classes = [IsAuthenticated]
+
+	def post(self, request: Request) -> Response:
+		user = request.user
+		try:
+			user_strava_profile = user.strava_profile
+		except StravaUser.DoesNotExist:
+			return Response(
+				{"error": "Strava account not linked or profile missing."},
+				status=status.HTTP_404_NOT_FOUND,
+			)
+
+		try:
+			worker = StravaHRWorker(user_strava_id=user_strava_profile.strava_id)
+			success = worker.fetch_and_store_strava_hr_zones()
+
+			if success:
+				# The worker logs specifics. Here, just confirm the operation.
+				return Response(
+					{"message": "Strava HR zones fetch process completed."},
+					status=status.HTTP_200_OK,
+				)
+			# This case implies a handled failure within the worker, e.g., API error.
+			# The worker should have logged the specific reason.
+			return Response(
+				{"error": "Failed to fetch Strava HR zones. See server logs for details."},
+				status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+			)
+		except Exception as e:
+			logger.exception(
+				f"Error fetching Strava HR zones for user {user_strava_profile.strava_id}: {e}"
+			)
+			return Response(
+				{"error": "An unexpected error occurred while fetching HR zones."},
+				status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+			)
+
+
+class UserHRZonesDisplayView(TemplateView):
+	"""Displays the user's configured heart rate zones."""
+
+	template_name = "api/hr_zone_display.html"
+
+	permission_classes = [IsAuthenticated]
+
+	def get_context_data(self, **kwargs) -> dict:
+		context = super().get_context_data(**kwargs)
+		user = self.request.user
+		custom_zones_config = None
+		hr_zones = []
+		error_message = None
+
+		if user.is_authenticated:
+			try:
+				custom_zones_config = CustomZonesConfig.objects.filter(
+					user=user.strava_profile, activity_type=ActivityType.DEFAULT
+				).first()
+
+				if custom_zones_config:
+					hr_zones = HeartRateZone.objects.filter(config=custom_zones_config).order_by(
+						"min_hr"
+					)
+					if not hr_zones:
+						logger.info(f"U:{user.id} Cfg:{custom_zones_config.id} NoHRZ")
+				else:
+					error_message = "No custom HR zone config. Please set one up."
+
+			except StravaUser.DoesNotExist:
+				error_message = (
+					"Strava profile not found. Cannot fetch custom zone configurations."
+				)
+			except Exception as e:
+				error_message = "An unexpected error occurred while fetching your custom HR zones."
+				logger.error(f"Error fetching custom HR zones for user {user.id}: {e!r}")
+		else:
+			error_message = "User not authenticated."
+
+		context["custom_zones_config"] = custom_zones_config
+		context["hr_zones"] = hr_zones
+		context["error_message"] = error_message
+		return context

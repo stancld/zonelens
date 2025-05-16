@@ -1,0 +1,258 @@
+{% extends "api/base.html" %}
+
+{% block title %}Your Custom Heart Rate Zones{% endblock %}
+
+{% block content %}
+    <style>
+nav {
+            display: none !important; /* Hide the main navigation bar */
+        }
+
+        /* Strava-inspired styles for hr_zone_display */
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
+            background-color: #f7f7f7;
+            color: #333333;
+        }
+
+        h1 {
+            color: #333333;
+            font-size: 28px;
+            margin-bottom: 20px;
+        }
+
+        h2 { /* Configuration heading */
+            color: #4a4a4a;
+            font-size: 20px;
+            font-weight: 600;
+            margin-top: 25px;
+            margin-bottom: 10px;
+        }
+
+        h3 { /* "Heart Rate Zones:" heading */
+            color: #4a4a4a;
+            font-size: 18px;
+            font-weight: 600;
+            margin-top: 20px;
+            margin-bottom: 10px;
+        }
+
+        .hr-zones-table {
+            width: 100%;
+            max-width: 600px;
+            border-collapse: collapse;
+            margin-top: 15px;
+            margin-bottom: 25px;
+            font-size: 14px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .hr-zones-table th,
+        .hr-zones-table td {
+            border: none;
+            border-bottom: 1px solid #e5e5e5;
+            padding: 12px 15px;
+            text-align: left;
+            vertical-align: middle;
+        }
+
+        .hr-zones-table th {
+            background-color: #f9f9f9;
+            color: #555;
+            font-weight: 600;
+            text-transform: uppercase;
+            font-size: 12px;
+            letter-spacing: 0.5px;
+        }
+        .hr-zones-table tr:last-child td {
+            border-bottom: none;
+        }
+
+        /* Zone-specific row styling */
+        .zone-row {
+            border-left: 10px solid transparent;
+        }
+        .zone-1 { border-left-color: #6D6D6D; } /* Zone 1: Grey */
+        .zone-2 { border-left-color: #0077CC; } /* Zone 2: Blue */
+        .zone-3 { border-left-color: #5E9E00; } /* Zone 3: Green */
+        .zone-4 { border-left-color: #FF9900; } /* Zone 4: Orange/Yellow */
+        .zone-5 { border-left-color: #E60000; } /* Zone 5: Red */
+        .zone-6 { border-left-color: #333333; } /* Zone 6 (if exists) */
+
+        #fetchStravaHrZonesButton {
+            background-color: #FC4C02; /* Strava Orange */
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            font-size: 15px;
+            font-weight: 600;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.2s ease;
+        }
+
+        #fetchStravaHrZonesButton:hover {
+            background-color: #e04402; /* Darker Strava Orange */
+        }
+
+        #fetchStravaHrZonesButton:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+
+        /* Message styles */
+        #fetchStatusMessage { /* Default style for the status div before specific classes are applied */
+            padding: 10px 15px;
+            margin-top: 15px;
+            border-radius: 4px;
+            font-size: 14px;
+            min-height: 1.5em; /* Prevent layout shift when empty */
+        }
+        .error-message {
+            color: #D8000C;
+            background-color: #FFD2D2;
+            border: 1px solid #D8000C;
+        }
+        .info-message {
+            color: #00529B;
+            background-color: #BDE5F8;
+            border: 1px solid #00529B;
+        }
+        .success-message {
+            color: #270; /* Dark Green */
+            background-color: #DFF2BF; /* Light Green */
+            border: 1px solid #270; /* Dark Green border */
+        }
+
+        .container a, p a {
+            color: #0077CC;
+            text-decoration: none;
+            font-weight: 500;
+        }
+        .container a:hover, p a:hover {
+            text-decoration: underline;
+            color: #005ea6;
+        }
+
+        p.back-link {
+            margin-top: 30px;
+            font-size: 14px;
+        }
+        p.back-link a {
+            color: #666;
+        }
+        p.back-link a:hover {
+            color: #333;
+        }
+    </style>
+
+    <div class="container"> <!-- This container class might be provided by base.html -->
+        <h1>Your Custom Heart Rate Zones</h1>
+
+        {% if error_message %}
+            <p class="error-message">{{ error_message }}</p>
+        {% elif custom_zones_config %}
+            <h2>Configuration: {% if custom_zones_config.config_name %}{{ custom_zones_config.config_name }} - {% endif %}{{ custom_zones_config.get_activity_type_display|default:custom_zones_config.activity_type }}</h2>
+
+            {% if hr_zones %}
+                <h3>Heart Rate Zones:</h3>
+                <table class="hr-zones-table">
+                    <thead>
+                        <tr>
+                            <th>Zone Name</th>
+                            <th>Min HR (bpm)</th>
+                            <th>Max HR (bpm)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for zone in hr_zones %}
+                        <tr class="zone-row zone-{{ forloop.counter }}">
+                            <td>{{ zone.name }}</td> {# Use name field #}
+                            <td>
+                                {% if zone.min_hr == 0 %}
+                                    {# Don't display 0 #}
+                                {% else %}
+                                    {{ zone.min_hr }}
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if zone.max_hr == 999 %}
+                                    {# Don't display 999 #}
+                                {% elif zone.max_hr is not None %}
+                                    {{ zone.max_hr }}
+                                {% else %}
+                                    &infin;
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            {% else %}
+                <p class="info-message">No heart rate zones are defined for the '{{ custom_zones_config.config_name }}' configuration.</p>
+            {% endif %}
+        {% else %}
+            <p class="info-message">No custom heart rate zone configuration found. You can set one up in your profile settings.</p>
+        {% endif %}
+
+        <div style="margin-top: 20px;">
+            <button id="fetchStravaHrZonesButton">Fetch/Refresh HR Zones from Strava</button>
+            <div id="fetchStatusMessage"></div>
+        </div>
+
+        <p class="back-link"><a href="/">Back to Home</a></p>
+    </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const fetchButton = document.getElementById('fetchStravaHrZonesButton');
+    const statusMessageDiv = document.getElementById('fetchStatusMessage');
+    const API_FETCH_URL = '/api/fetch-strava-hr-zones/'; // Correct endpoint for FetchStravaHRZonesView
+    const csrfToken = "{{ csrf_token }}";
+
+    if (fetchButton) {
+        fetchButton.addEventListener('click', function() {
+            statusMessageDiv.textContent = 'Fetching HR zones from Strava...';
+            statusMessageDiv.className = 'info-message'; // Use existing styles
+            fetchButton.disabled = true;
+
+            fetch(API_FETCH_URL, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': csrfToken
+                },
+                // body: JSON.stringify({}), // Add body if your endpoint expects it
+            })
+            .then(response => {
+                if (response.ok) {
+                    return response.json();
+                } else {
+                    return response.json().then(err => {
+                        throw new Error(err.detail || err.message || 'Failed to fetch HR zones.');
+                    });
+                }
+            })
+            .then(data => {
+                statusMessageDiv.textContent = data.message || 'HR zones fetched successfully! Reloading page...';
+                statusMessageDiv.className = 'success-message';
+                // Reload the page to see updated zones
+                setTimeout(() => {
+                    window.location.reload();
+                }, 2000); // Delay for user to read message
+            })
+            .catch(error => {
+                console.error('Error fetching HR zones:', error);
+                statusMessageDiv.textContent = 'Error: ' + error.message;
+                statusMessageDiv.className = 'error-message'; // Use existing styles
+            })
+            .finally(() => {
+                fetchButton.disabled = false;
+            });
+        });
+    }
+});
+</script>
+{% endblock %}

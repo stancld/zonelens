@@ -6,7 +6,13 @@ from django.utils import timezone
 
 from api.hr_processing import OUTSIDE_ZONES_KEY, calculate_time_in_zones, parse_activity_streams
 from api.logging import get_logger
-from api.models import ActivityType, ActivityZoneTimes, CustomZonesConfig, StravaUser
+from api.models import (
+	ActivityType,
+	ActivityZoneTimes,
+	CustomZonesConfig,
+	HeartRateZone,
+	StravaUser,
+)
 from api.strava_client import StravaApiClient
 
 if TYPE_CHECKING:
@@ -158,3 +164,80 @@ class StravaHRWorker:
 		if isinstance(activity_date_attr, str):
 			return timezone.datetime.fromisoformat(activity_date_attr.replace("Z", "+00:00"))
 		return activity_date_attr
+
+	def fetch_and_store_strava_hr_zones(self) -> bool:
+		"""Fetches HR zones from Strava and stores them in the database.
+
+		Returns
+		-------
+		    True if zones were successfully fetched and stored, False otherwise.
+		"""
+		self.logger.info(f"Attempting to fetch Strava HR zones for user {self.user.strava_id}.")
+		try:
+			strava_zones_data = self.strava_client.fetch_athlete_zones()
+			if not strava_zones_data:
+				self.logger.warning(
+					f"No zone data returned from Strava for user {self.user.strava_id}."
+				)
+				return False
+
+			heart_rate_zones_data = strava_zones_data["heart_rate"]["zones"]
+			# Ensure the default CustomZonesConfig exists for this user and activity type
+			config, config_created = CustomZonesConfig.objects.update_or_create(
+				user=self.user,
+				activity_type=ActivityType.DEFAULT,
+			)
+			# Always clear existing zones for this config before potentially adding new ones
+			# This handles both updating with new zones and clearing out old ones
+			num_deleted, _ = HeartRateZone.objects.filter(config=config).delete()
+			if num_deleted > 0:
+				self.logger.info(
+					f"Deleted {num_deleted} old HR zones for config {config.id} "
+					f"for user {self.user.strava_id}."
+				)
+
+			if not heart_rate_zones_data:
+				self.logger.info(
+					f"No HR zones found on Strava for user {self.user.strava_id}. "
+					f"Any existing zones for default config {config.id} have been cleared."
+				)
+				return True  # Operation successful, state reflects no zones
+
+			# Strava returned HR zones, so create them
+			new_zones_to_create = []
+			for i, zone_data in enumerate(heart_rate_zones_data):
+				min_hr = zone_data.get("min")
+				max_hr_strava = zone_data.get(
+					"max"
+				)  # Renamed to avoid clash with model field name
+
+				# Strava's last zone has max as -1, interpret as no upper limit
+				# PositiveIntegerField in model typically cannot be None and needs a value.
+				max_hr_db = 999 if max_hr_strava == -1 or max_hr_strava is None else max_hr_strava
+
+				# Assuming min_hr is always present and valid from Strava.
+				# If min_hr could be missing, handle similarly.
+				# min_hr_db = min_hr if min_hr is not None else 0 # Example
+
+				new_zones_to_create.append(
+					HeartRateZone(
+						config=config,
+						name=f"Z{i + 1}",  # Strava zones are typically Z1-Z5
+						order=i + 1,
+						min_hr=min_hr,  # Assumes min_hr is always present from Strava
+						max_hr=max_hr_db,
+					)
+				)
+
+			if new_zones_to_create:
+				HeartRateZone.objects.bulk_create(new_zones_to_create)
+			else:  # Should ideally not happen if heart_rate_zones_data is not empty
+				self.logger.info("Strava returned zone data, but no new HR zones were processed.")
+
+			return True
+
+		except Exception as e:
+			self.logger.exception(
+				f"Error fetching/storing Strava HR zones for user {self.user.strava_id}: {e}"
+			)
+			return False

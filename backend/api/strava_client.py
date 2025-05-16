@@ -30,6 +30,7 @@ STRAVA_API_BASE_URL = "https://www.strava.com/api/v3"
 STRAVA_TOKEN_URL = f"{STRAVA_API_BASE_URL}/oauth/token"
 STRAVA_API_ACTIVITIES_URL = f"{STRAVA_API_BASE_URL}/athlete/activities"
 STRAVA_API_STREAMS_URL_TEMPLATE = f"{STRAVA_API_BASE_URL}/activities/{{activity_id}}/streams"
+STRAVA_API_ATHLETE_ZONES_URL = f"{STRAVA_API_BASE_URL}/athlete/zones"
 
 # Default per_page, Strava API max is 200
 STRAVA_API_MAX_PER_PAGE = 200
@@ -180,6 +181,70 @@ class StravaApiClient:
 			logger.error(f"Request error for {self.strava_user.strava_id}: {e}")
 		except ValueError as e:
 			logger.error(f"JSON decode error for {self.strava_user.strava_id}: {e}")
+		return None
+
+	def fetch_athlete_zones(self) -> dict[str, dict[str, Any]] | None:
+		"""Fetches the athlete's defined zones (HR, Power) from Strava.
+
+		Returns
+		-------
+			A dic of zone data as dictionaries, or None if an error occurs.
+		"""
+		logger.info(f"Fetching athlete zones for user {self.strava_user.strava_id}")
+		if not self.strava_user.access_token:
+			logger.info(f"No access token for user {self.strava_user.strava_id}, trying refresh.")
+			if not self.refresh_strava_token():
+				raise ValueError(
+					f"Cannot retrieve access token for user {self.strava_user.strava_id}."
+				)
+
+		try:
+			response = self.get(STRAVA_API_ATHLETE_ZONES_URL, access_token=self.access_token)
+			response.raise_for_status()
+			return response.json()
+		except requests.exceptions.HTTPError as e:
+			status_code = e.response.status_code if e.response is not None else None
+			text = e.response.text if e.response is not None else "No response body"
+
+			if status_code == 401:
+				logger.info(
+					f"401 fetching zones for user {self.strava_user.strava_id}. Refreshing token."
+				)
+				if self.refresh_strava_token():
+					logger.info(
+						f"Token refreshed for {self.strava_user.strava_id}. Retrying zones fetch."
+					)
+					try:
+						response = self.get(
+							STRAVA_API_ATHLETE_ZONES_URL, access_token=self.access_token
+						)
+						response.raise_for_status()
+						return response.json()
+					except requests.exceptions.HTTPError as retry_e:
+						retry_status = retry_e.response.status_code if retry_e.response else "N/A"
+						retry_text = retry_e.response.text if retry_e.response else ""
+						logger.error(
+							f"Retry HTTP error fetching zones for {self.strava_user.strava_id}: "
+							f"{retry_status} {retry_text[:50]}"
+						)
+					except (requests.exceptions.RequestException, ValueError) as retry_general_e:
+						logger.error(
+							f"Retry error for {self.strava_user.strava_id} (zones): "
+							f"{retry_general_e}"
+						)
+				else:
+					logger.error(
+						f"Refresh failed for {self.strava_user.strava_id}, cannot retry zones."
+					)
+			else:
+				logger.error(
+					f"HTTP error fetching zones for {self.strava_user.strava_id}: "
+					f"{status_code or 'N/A'} {text[:50]}"
+				)
+		except requests.exceptions.RequestException as e:
+			logger.error(f"Request error fetching zones for {self.strava_user.strava_id}: {e}")
+		except ValueError as e:  # Includes JSONDecodeError
+			logger.error(f"JSON decode error fetching zones for {self.strava_user.strava_id}: {e}")
 		return None
 
 	def fetch_all_strava_activities(
