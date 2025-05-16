@@ -386,6 +386,18 @@ document.addEventListener('DOMContentLoaded', function() {
 
     if (fetchButton) {
         fetchButton.addEventListener('click', function() {
+            // Check if a custom config exists (passed from Django template)
+            const customConfigId = "{{ custom_zones_config.id|default:'' }}"; // Get config ID, default to empty string if not set
+
+            if (customConfigId) { // If there's a config ID, it means a config exists that might be overwritten
+                const userConfirmed = confirm("Fetching new zones from Strava will override your current custom settings and any unsaved changes will also be lost. Are you sure you want to proceed?");
+                if (!userConfirmed) {
+                    statusMessageDiv.textContent = 'Operation cancelled by user.';
+                    statusMessageDiv.className = 'info-message'; // Use existing styles
+                    return; // Abort if user cancels
+                }
+            }
+
             statusMessageDiv.textContent = 'Fetching HR zones from Strava...';
             statusMessageDiv.className = 'info-message'; // Use existing styles
             fetchButton.disabled = true;
