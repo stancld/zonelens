@@ -33,4 +33,9 @@ urlpatterns = [
 		views.FetchStravaHRZonesView.as_view(),
 		name="fetch_strava_hr_zones",
 	),
+	path(
+		"user/hr-zones/",
+		views.UserHRZonesDisplayView.as_view(),
+		name="user_hr_zones_display",
+	),
 ]

@@ -199,10 +199,7 @@ class StravaApiClient:
 				)
 
 		try:
-			response = self.get(
-				STRAVA_API_ATHLETE_ZONES_URL,
-				access_token=self.access_token,
-			)
+			response = self.get(STRAVA_API_ATHLETE_ZONES_URL, access_token=self.access_token)
 			response.raise_for_status()
 			return response.json()
 		except requests.exceptions.HTTPError as e:
@@ -219,8 +216,7 @@ class StravaApiClient:
 					)
 					try:
 						response = self.get(
-							STRAVA_API_ATHLETE_ZONES_URL,
-							access_token=self.access_token,
+							STRAVA_API_ATHLETE_ZONES_URL, access_token=self.access_token
 						)
 						response.raise_for_status()
 						return response.json()

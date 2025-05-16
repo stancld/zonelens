@@ -40,7 +40,7 @@ async function getCookie(name, url) {
 document.addEventListener('DOMContentLoaded', function() {
     const loginButton = document.getElementById('loginButton');
     const syncButton = document.getElementById('syncButton');
-    const fetchHrZonesButton = document.getElementById('fetchHrZonesButton'); // Added this line
+    const viewMyHrZonesButton = document.getElementById('viewMyHrZonesButton');
     const afterDateInput = document.getElementById('afterDate');
     const statusMessage = document.getElementById('statusMessage');
 
@@ -148,32 +148,9 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    if (fetchHrZonesButton) {
-        fetchHrZonesButton.addEventListener('click', async function() {
-            updateStatus('Checking HR zone status...', 'info');
-            const zonesAlreadyAvailable = await checkHrZonesAvailability(); // This updates status if it fails
-
-            if (zonesAlreadyAvailable) {
-                updateStatus('HR zones are already available.', 'info');
-                await updateSyncButtonState(); // Ensure sync button state is correct
-                return;
-            }
-
-            // Zones not available (or checkHrZonesAvailability failed and returned false)
-            // If checkHrZonesAvailability failed, it would have set an error message.
-            // If it returned false because no zones, then we proceed to fetch.
-            if (statusMessage.classList.contains('status-error')) {
-                // If checkHrZonesAvailability already set an error, don't overwrite it immediately by saying "fetching..."
-                // But still, let's ensure the sync button state is updated based on this failure.
-                await updateSyncButtonState();
-                return;
-            }
-
-            updateStatus('HR zones not found. Attempting to fetch from Strava...', 'info');
-            await fetchAndStoreStravaHrZones(); // This function updates status on its own outcome
-
-            // After attempting to fetch, update the sync button state based on the new reality
-            await updateSyncButtonState();
+    if (viewMyHrZonesButton) {
+        viewMyHrZonesButton.addEventListener('click', function() {
+            chrome.tabs.create({ url: 'https://localhost:8000/api/user/hr-zones/' });
         });
     }
 
