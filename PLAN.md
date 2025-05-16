@@ -76,6 +76,7 @@ This file outlines the development steps and serves as a checklist to track prog
     - [ ] Implement logic to store/manage backend session/token in `chrome.storage.local` after successful auth callback.
 - [ ] **Custom Zone UI**
     - [x] Enable configuring HR zones boundaries.
+    - [ ] Enable configuring number of zones
     - [ ] Add form elements to define zone boundaries per activity type.
     - [x] Implement JS in options/popup to:
         - [x] Fetch current settings from `GET /api/zones/settings`.

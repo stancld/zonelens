@@ -58,9 +58,24 @@ A client-server model:
 
 ## Key API Endpoints
 
-*   `/api/auth/strava`: Initiates Strava OAuth.
-*   `/api/auth/strava/callback`: Handles Strava's OAuth callback.
-*   `/api/zones?year=YYYY&month=MM`: Provides aggregated zone data to the extension.
-*   `/api/zones/settings`: (Planned) For managing user-defined HR zones.
+*   **Authentication & Profile:**
+    *   `/api/auth/strava/`: Initiates Strava OAuth2 authentication.
+    *   `/api/auth/strava/callback/`: Handles Strava's OAuth2 callback.
+    *   `/api/profile/`: Displays the user's profile information (requires authentication).
+*   **Data Synchronization:**
+    *   `/api/strava/sync-activities/`: `POST` Triggers a sync of recent activities from Strava (requires authentication).
+*   **Heart Rate Zone Management & Display:**
+    *   `/api/settings/custom-zones/`:
+        *   `GET`: Lists all custom HR zone configurations for the authenticated user.
+        *   `POST`: Creates a new custom HR zone configuration for the authenticated user.
+    *   `/api/settings/custom-zones/<uuid:pk>/` (Requires authentication):
+        *   `GET`: Retrieves a specific custom HR zone configuration by its UUID.
+        *   `PUT`: Updates a specific custom HR zone configuration.
+        *   `DELETE`: Deletes a specific custom HR zone configuration.
+    *   `/api/fetch-strava-hr-zones/`: `POST` Fetches HR zones directly from Strava and updates/creates the user's 'DEFAULT' configuration (requires authentication).
+    *   `/api/user/hr-zones/`: `GET` Renders the HTML page for viewing and editing custom HR zones (`hr_zone_display.html`) (requires authentication).
+    *   `/api/user/hr-zone-status/`: `GET` Provides the status of the user's HR zone configuration (e.g., if default Strava zones are used or if custom zones are set) (requires authentication).
+*   **Aggregated Data for Extension:**
+    *   `/api/zones/`: `GET` Provides aggregated zone data (e.g., time in zones per week/month). Accepts query parameters like `year`, `month`, `week`, `period_type` (requires authentication).
 
 (For more detailed setup and historical planning, see `PLAN.md`.)
