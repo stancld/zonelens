@@ -198,6 +198,21 @@ class CustomZonesSettingsView(generics.ListCreateAPIView):
 		return CustomZonesConfig.objects.none()
 
 
+class CustomZonesSettingsDetailView(generics.RetrieveUpdateDestroyAPIView):
+	"""Retrieve, update, or delete a specific custom zone configuration."""
+
+	serializer_class = CustomZonesConfigSerializer
+	permission_classes = [IsAuthenticated]
+	lookup_field = "pk"
+
+	def get_queryset(self) -> QuerySet[CustomZonesConfig]:
+		"""Ensure users can only access their own configurations."""
+		user = self.request.user
+		if hasattr(user, "strava_profile") and user.strava_profile:
+			return CustomZonesConfig.objects.filter(user=user.strava_profile)
+		return CustomZonesConfig.objects.none()
+
+
 class ProcessActivitiesView(APIView):
 	"""View to trigger Strava activities syncing and processing for a user."""
 
