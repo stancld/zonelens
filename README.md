@@ -19,9 +19,11 @@ The main aim is to provide a visual representation of time spent in different HR
 
 This is an **experimental project** primarily developed as an exercise in **"vibe-coding"** – rapidly iterating and building features with a focus on learning and exploration rather than achieving maximum efficiency or a production-ready state. As such, some design choices or implementation details might reflect this learning process.
 
-## 📸 Current State (as of May 10, 2025)
+## 📸 Current State (as of May 16, 2025)
 
-![Current WIP Screenshot](images/wip_250510.png)
+![Current WIP Calendar Screenshot](images/wip_calendar_250516.png)
+
+![Current WIP HR config Screenshot](images/wip_hr_config_250516.png)
 
 ## Core Features
 
