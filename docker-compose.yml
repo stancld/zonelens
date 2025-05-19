@@ -14,9 +14,33 @@ services:
     ports:
       - ${DB_PORT-5432}:5432
 
+  strava-backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.dev
+    container_name: strava-backend
+    depends_on:
+      - postgres
+    env_file:
+      - .env
+    environment:
+      DB_HOST: postgres
+    command: >
+      bash -c "
+      python backend/manage.py migrate;
+      python backend/manage.py migrate api;
+      python backend/manage.py runserver_plus --cert-file cert.pem --key-file key.pem 0.0.0.0:8000;
+      "
+    ports:
+      - 127.0.0.1:8000:8000
+    volumes:
+      - ./backend:/backend
+      - ./cert.pem:/cert.pem
+      - ./key.pem:/key.pem
+
   test-backend:
     build:
-      context: ./strava_zones_backend
+      context: ./backend
       dockerfile: Dockerfile.dev
     container_name: strava-test-backend
     depends_on:
