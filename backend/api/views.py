@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import calendar
+import json
 import logging
 from datetime import datetime
 from typing import TYPE_CHECKING
@@ -451,4 +452,10 @@ class UserHRZonesDisplayView(TemplateView):
 		context["custom_zones_config"] = custom_zones_config
 		context["hr_zones"] = hr_zones
 		context["error_message"] = error_message
+		existing = list(
+			CustomZonesConfig.objects.filter(user=user.strava_profile).values_list(
+				"activity_type", flat=True
+			)
+		)
+		context["existing_activity_types_json"] = json.dumps(existing)
 		return context

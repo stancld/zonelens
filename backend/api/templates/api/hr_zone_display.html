@@ -154,7 +154,12 @@ nav {
         {% if error_message %}
             <p class="error-message">{{ error_message }}</p>
         {% elif custom_zones_config %}
-            <h2>Configuration: {% if custom_zones_config.config_name %}{{ custom_zones_config.config_name }} - {% endif %}{{ custom_zones_config.get_activity_type_display|default:custom_zones_config.activity_type }}</h2>
+            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
+                <h2 style="margin:0;">Configuration: {% if custom_zones_config.config_name %}{{ custom_zones_config.config_name }} - {% endif %}{{ custom_zones_config.get_activity_type_display|default:custom_zones_config.activity_type }}</h2>
+                {% if custom_zones_config.activity_type == "DEFAULT" %}
+                <button id="addActivityConfigButton" title="Add activity-specific configuration" style="display:inline-flex; align-items:center; justify-content:center; width:22px; height:22px; background-color:#FC4C02; color:white; border:none; border-radius:50%; font-size:14px; font-weight:600; line-height:1; cursor:pointer;">+</button>
+                {% endif %}
+            </div>
 
             {% if hr_zones %}
                 <form id="hrZoneForm" method="POST">
@@ -439,4 +444,64 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 </script>
+
+<script>
+(function() {
+  let dropdown;
+  function closeDropdown() {
+    if (dropdown) { dropdown.remove(); dropdown = null; document.removeEventListener('click', handleDocClick); }
+  }
+  function handleDocClick(e) {
+    if (dropdown && !dropdown.contains(e.target) && e.target.id !== 'addActivityConfigButton') {
+      closeDropdown();
+    }
+  }
+  document.addEventListener('DOMContentLoaded', function() {
+    const addBtn = document.getElementById('addActivityConfigButton');
+    if (!addBtn) return;
+    addBtn.addEventListener('click', function(e) {
+      e.preventDefault();
+      if (dropdown) { closeDropdown(); return; }
+      const types = [
+        { value: 'DEFAULT', label: 'Default' },
+        { value: 'RUN', label: 'Run' },
+        { value: 'RIDE', label: 'Ride' }
+      ];
+      const existing = JSON.parse('{{ existing_activity_types_json|escapejs }}');
+      const available = types.filter(t => !existing.includes(t.value));
+      if (!available.length) return;
+      const rect = addBtn.getBoundingClientRect();
+      dropdown = document.createElement('div');
+      dropdown.id = 'activityTypeDropdown';
+      dropdown.style.position = 'absolute';
+      dropdown.style.top = (rect.bottom + window.scrollY) + 'px';
+      dropdown.style.left = (rect.left + window.scrollX) + 'px';
+      dropdown.style.background = '#fff';
+      dropdown.style.border = '1px solid #ccc';
+      dropdown.style.borderRadius = '4px';
+      dropdown.style.boxShadow = '0 1px 3px rgba(0,0,0,0.2)';
+      dropdown.style.fontSize = '14px';
+      dropdown.style.minWidth = '100px';
+      dropdown.style.zIndex = '1000';
+      available.forEach(t => {
+        const item = document.createElement('div');
+        item.textContent = t.label;
+        item.dataset.value = t.value;
+        item.style.padding = '6px 8px';
+        item.style.cursor = 'pointer';
+        item.addEventListener('mouseenter', () => item.style.backgroundColor = '#f5f5f5');
+        item.addEventListener('mouseleave', () => item.style.backgroundColor = '#fff');
+        item.addEventListener('click', function() {
+          // TODO: handle selection
+          closeDropdown();
+        });
+        dropdown.appendChild(item);
+      });
+      document.body.appendChild(dropdown);
+      setTimeout(() => document.addEventListener('click', handleDocClick), 0);
+    });
+  });
+})();
+</script>
+
 {% endblock %}
