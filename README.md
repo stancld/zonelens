@@ -23,7 +23,7 @@ This is an **experimental project** primarily developed as an exercise in **"vib
 
 ![Current WIP Calendar Screenshot](images/wip_calendar_250516.png)
 
-![Current WIP HR config Screenshot](images/wip_hr_config_250516.png)
+![Current WIP HR config Screenshot](images/wip_hr_config_250523.png)
 
 ## Core Features
 
