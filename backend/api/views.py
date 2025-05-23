@@ -453,7 +453,10 @@ class UserHRZonesDisplayView(LoginRequiredMixin, TemplateView):
 						zones = sorted(config_item.zones_definition.all(), key=lambda z: z.min_hr)
 						user_configs_data.append({"config": config_item, "zones": zones})
 				else:
-					error_message = "No custom HR zone configurations found. Please set one up."
+					error_message = (
+						"No custom HR zone configurations found. "
+						"Please fetch default from Strava to initial setup."
+					)
 
 				# Populate existing_activities
 				#  (used for UI hints, e.g., which activities already have configs)
