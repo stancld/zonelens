@@ -36,7 +36,7 @@ curl -k -X POST \
           {
             "name": "Z5 Anaerobic",
             "min_hr": 182,
-            "max_hr": 999,
+            "max_hr": 220,
             "order": 5
           }
         ]

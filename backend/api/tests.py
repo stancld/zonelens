@@ -3,13 +3,17 @@ from __future__ import annotations
 import json
 import unittest.mock
 from datetime import datetime, timedelta
+from importlib import import_module
+from typing import TYPE_CHECKING
 from unittest.mock import MagicMock, patch
 from urllib.parse import urlparse
 
 import pytz
 import requests_mock
+from django.conf import settings
 from django.contrib.auth import get_user_model
-from django.test import TestCase, override_settings
+from django.contrib.messages import get_messages, storage
+from django.test import RequestFactory, TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 from rest_framework import status
@@ -38,7 +42,13 @@ from api.strava_client import (
 	StravaApiClient,
 )
 from api.utils import decrypt_data, encrypt_data
+from api.views import UserHRZonesDisplayView
 from api.worker import StravaHRWorker
+
+if TYPE_CHECKING:
+	from django.http import HttpRequest, HttpResponse
+
+User = get_user_model()
 
 
 class InitialMigrationTests(TestCase):
@@ -1142,6 +1152,17 @@ class ZoneSummaryViewTests(APITestCase):
 		# Week 9 of 2025 is Feb 24 - Mar 2. Activities on Mar 1 & 2 fall in this week and month.
 		# Activity 1: March 1, 2025 (Saturday, Week 9)
 		activity1_date = datetime(2025, 3, 1, 10, 0, 0, tzinfo=pytz.UTC)
+		# Sunday, February 4, 2024 (ISO Week 5)
+		activity2_date = datetime(2025, 3, 2, 11, 0, 0, tzinfo=pytz.UTC)
+
+		iso_year, iso_week_jan, _ = activity1_date.isocalendar()
+		iso_year_feb, iso_week_feb, _ = activity2_date.isocalendar()
+
+		self.assertEqual(iso_year, 2025)
+		self.assertEqual(iso_week_jan, 9)
+		self.assertEqual(iso_year_feb, 2025)
+		self.assertEqual(iso_week_feb, 9)  # Both should be in week 9
+
 		ActivityZoneTimes.objects.create(
 			user=self.strava_user,
 			activity_id=101,
@@ -1165,7 +1186,6 @@ class ZoneSummaryViewTests(APITestCase):
 		)
 
 		# Activity 2: March 2, 2025 (Sunday, Week 9)
-		activity2_date = datetime(2025, 3, 2, 11, 0, 0, tzinfo=pytz.UTC)
 		ActivityZoneTimes.objects.create(
 			user=self.strava_user,
 			activity_id=102,
@@ -1367,3 +1387,383 @@ class ZoneSummaryModelTests(TestCase):
 			self.assertEqual(summary_no_context.zone_times_seconds, {"Z1 Jan": 100, "Z1 Feb": 200})
 			# Ensure it's still the same DB object
 			self.assertEqual(summary_jan_context.pk, summary_no_context.pk)  # type: ignore[union-attr]
+
+
+class UserHRZonesDisplayViewTests(TestCase):
+	def setUp(self) -> None:
+		self.factory = RequestFactory()
+		self.user = User.objects.create_user(
+			username="testuserdisplayview", password="password", email="test@example.com"
+		)
+		self.strava_user = StravaUser.objects.create(
+			strava_id=1234567,  # Unique Strava ID
+			user=self.user,
+			access_token="test_access_token",
+			refresh_token="test_refresh_token",
+			token_expires_at=timezone.now() + timedelta(hours=1),
+		)
+		# Login the user for views that require authentication via self.client
+		self.client.login(username="testuserdisplayview", password="password")
+
+		self.view = UserHRZonesDisplayView()
+		self.url = reverse("user_hr_zones_display")
+
+		# Create a default configuration
+		self.default_config = CustomZonesConfig.objects.create(
+			user=self.strava_user, activity_type=ActivityType.DEFAULT
+		)
+		self.dz1 = HeartRateZone.objects.create(
+			config=self.default_config, name="Z1 Default", min_hr=0, max_hr=120, order=1
+		)
+		self.dz2 = HeartRateZone.objects.create(
+			config=self.default_config, name="Z2 Default", min_hr=121, max_hr=140, order=2
+		)
+		self.dz3 = HeartRateZone.objects.create(
+			config=self.default_config, name="Z3 Default", min_hr=141, max_hr=160, order=3
+		)
+
+		# Create a running configuration
+		self.running_config = CustomZonesConfig.objects.create(
+			user=self.strava_user, activity_type=ActivityType.RUN
+		)
+		self.rz1 = HeartRateZone.objects.create(
+			config=self.running_config, name="Run Z1", min_hr=0, max_hr=110, order=1
+		)
+		self.rz2 = HeartRateZone.objects.create(
+			config=self.running_config, name="Run Z2", min_hr=111, max_hr=130, order=2
+		)
+
+		# Create a cycling configuration (initially empty for some tests)
+		self.cycling_config = CustomZonesConfig.objects.create(
+			user=self.strava_user, activity_type=ActivityType.RIDE
+		)
+
+	def _make_post_request_to_view(
+		self, user, data: dict, view_instance: UserHRZonesDisplayView
+	) -> tuple[HttpRequest, HttpResponse]:
+		"""
+		Helper to make a POST request directly to the view's post method.
+		Returns the request object and the response from the view.
+		"""
+		request = self.factory.post(self.url, data)
+		request.user = user
+
+		# Manually add session and messages support for RequestFactory requests
+		if not hasattr(request, "session"):
+			engine = import_module(settings.SESSION_ENGINE)
+			request.session = engine.SessionStore()
+
+		if not hasattr(request, "_messages"):
+			request._messages = storage.default_storage(request)
+
+		response_from_view = view_instance.post(request)
+		return request, response_from_view
+
+	def _generate_zone_data_dict(
+		self, zone_id: int | None, name: str, min_hr: int, max_hr: int, order: int
+	) -> dict[str, str]:
+		"""Generates a dictionary for a single zone's data (for internal use in tests)."""
+		return {
+			"id": str(zone_id) if zone_id else "",
+			"name": name,
+			"min_hr": str(min_hr),
+			"max_hr": str(max_hr),
+			"order": str(order),
+		}
+
+	def _build_form_data(self, action: str, configs_data_list: list[tuple] | None = None) -> dict:
+		"""Builds the flat form data dictionary as expected by the view.
+
+		Additional parameters
+		---------------------
+		configs_data_list
+			List of tuples: (config_idx, config_id, activity_type_value, zones_list_of_dicts)
+		"""
+		form_data = {"action": action}
+		if configs_data_list:
+			for (
+				config_idx,
+				config_id,
+				activity_type_value,
+				zones_list_of_dicts,
+			) in configs_data_list:
+				form_data[f"configs[{config_idx}][id]"] = str(config_id)
+				form_data[f"configs[{config_idx}][activity_type]"] = activity_type_value
+				for zone_idx, zone_data_dict in enumerate(zones_list_of_dicts):
+					for key, value in zone_data_dict.items():
+						form_data[f"configs[{config_idx}][zones][{zone_idx}][{key}]"] = value
+		return form_data
+
+	def test_get_user_hr_zones_display_authenticated(self) -> None:
+		response = self.client.get(self.url)
+		self.assertEqual(response.status_code, 200)
+		self.assertTemplateUsed(response, "api/hr_zone_display.html")
+		self.assertIn("user_zone_configurations", response.context)
+		self.assertEqual(len(response.context["user_zone_configurations"]), 3)
+
+	def test_save_all_configs_successful_update_and_create(self) -> None:
+		default_zones_data = [
+			self._generate_zone_data_dict(self.dz1.id, "Z1 Default Updated", 0, 125, 1),
+			self._generate_zone_data_dict(self.dz2.id, "Z2 Default Updated", 126, 145, 2),
+			self._generate_zone_data_dict(self.dz3.id, "Z3 Default", 146, 165, 3),
+			self._generate_zone_data_dict(None, "Z4 Default New", 166, 999, 4),
+		]
+		running_zones_data = [
+			self._generate_zone_data_dict(self.rz1.id, "Run Z1 Updated", 0, 115, 1),
+			self._generate_zone_data_dict(None, "Run Z3 New", 116, 135, 2),
+		]
+
+		form_data = self._build_form_data(
+			action="save_all_zone_configs",
+			configs_data_list=[
+				(0, self.default_config.id, ActivityType.DEFAULT.value, default_zones_data),  # type: ignore[attr-defined]
+				(1, self.running_config.id, ActivityType.RUN.value, running_zones_data),  # type: ignore[attr-defined]
+			],
+		)
+
+		request_obj, response = self._make_post_request_to_view(self.user, form_data, self.view)
+		self.assertEqual(response.status_code, 302)
+		messages = list(get_messages(request_obj))
+		self.assertEqual(len(messages), 1)
+		self.assertEqual(str(messages[0]), "Heart rate zones saved successfully!")
+
+		self.default_config.refresh_from_db()
+		self.assertEqual(self.default_config.zones_definition.count(), 4)
+		self.assertEqual(self.default_config.zones_definition.get(order=1).max_hr, 125)
+		self.assertEqual(self.default_config.zones_definition.get(order=4).name, "Z4 Default New")
+
+		self.running_config.refresh_from_db()
+		self.assertEqual(self.running_config.zones_definition.count(), 2)
+		self.assertEqual(
+			self.running_config.zones_definition.get(order=1).name, "Z1 Default Updated"
+		)
+		self.assertEqual(self.running_config.zones_definition.get(order=1).max_hr, 115)
+		self.assertEqual(
+			self.running_config.zones_definition.get(order=2).name, "Z2 Default Updated"
+		)
+		self.assertEqual(self.running_config.zones_definition.get(order=2).max_hr, 135)
+
+	def test_save_all_configs_default_zone_name_propagation(self) -> None:
+		default_zones_data = [
+			self._generate_zone_data_dict(self.dz1.id, "Default Alpha", 0, 120, 1),
+			self._generate_zone_data_dict(self.dz2.id, "Default Beta", 121, 140, 2),
+		]
+		running_zones_data = [
+			self._generate_zone_data_dict(self.rz1.id, "Original Run Z1", 0, 110, 1),
+			self._generate_zone_data_dict(self.rz2.id, "Original Run Z2", 111, 130, 2),
+		]
+		form_data = self._build_form_data(
+			action="save_all_zone_configs",
+			configs_data_list=[
+				(0, self.default_config.id, ActivityType.DEFAULT.value, default_zones_data),  # type: ignore[attr-defined]
+				(1, self.running_config.id, ActivityType.RUN.value, running_zones_data),  # type: ignore[attr-defined]
+			],
+		)
+		_request_obj, _response = self._make_post_request_to_view(self.user, form_data, self.view)
+
+		self.running_config.refresh_from_db()
+		self.assertEqual(self.running_config.zones_definition.get(order=1).name, "Default Alpha")
+		self.assertEqual(self.running_config.zones_definition.get(order=2).name, "Default Beta")
+		self.default_config.refresh_from_db()
+		self.assertEqual(self.default_config.zones_definition.get(order=1).name, "Default Alpha")
+
+	def test_save_all_configs_delete_zones(self) -> None:
+		default_zones_data = [
+			self._generate_zone_data_dict(self.dz1.id, "Z1 Default Only", 0, 150, 1),
+		]
+		form_data = self._build_form_data(
+			action="save_all_zone_configs",
+			configs_data_list=[
+				(
+					0,
+					self.default_config.id,
+					ActivityType.DEFAULT.value,  # type: ignore[attr-defined]
+					default_zones_data,
+				),  # Changed to DEFAULT from RUN
+			],
+		)
+		_request_obj, _response = self._make_post_request_to_view(self.user, form_data, self.view)
+		self.default_config.refresh_from_db()
+		self.assertEqual(self.default_config.zones_definition.count(), 1)
+		self.assertEqual(self.default_config.zones_definition.first().name, "Z1 Default Only")
+
+	def test_save_all_configs_open_ended_max_hr(self):
+		default_zones_data = [
+			self._generate_zone_data_dict(self.dz1.id, "Z1", 0, 120, 1),
+			self._generate_zone_data_dict(self.dz2.id, "Z2 Open", 121, "open", 2),
+			self._generate_zone_data_dict(self.dz3.id, "Z3 Empty", 141, "", 3),
+		]
+		form_data = self._build_form_data(
+			action="save_all_zone_configs",
+			configs_data_list=[
+				(0, self.default_config.id, ActivityType.DEFAULT.value, default_zones_data),
+			],
+		)
+		request_obj, response = self._make_post_request_to_view(
+			self.user, form_data, self.view
+		)  # Modified
+		self.default_config.refresh_from_db()
+		self.assertEqual(self.default_config.zones_definition.get(order=2).max_hr, 220)
+		self.assertEqual(self.default_config.zones_definition.get(order=3).max_hr, 220)
+
+	def test_add_default_zones_to_empty_config(self) -> None:
+		self.assertTrue(self.cycling_config.zones_definition.count() == 0)
+		form_data = {"action": f"add_default_zones_to_{self.cycling_config.id}"}
+
+		request_obj, response = self._make_post_request_to_view(self.user, form_data, self.view)
+		self.assertEqual(response.status_code, 302)
+		messages = list(get_messages(request_obj))
+		self.assertTrue(any("Default zones added" in str(m) for m in messages))
+
+		self.cycling_config.refresh_from_db()
+		self.assertEqual(
+			self.cycling_config.zones_definition.count(),
+			self.default_config.zones_definition.count(),
+		)
+		cycled_z1 = self.cycling_config.zones_definition.get(order=1)
+		default_z1 = self.default_config.zones_definition.get(order=1)
+		self.assertEqual(cycled_z1.name, default_z1.name)
+		self.assertEqual(cycled_z1.min_hr, default_z1.min_hr)
+		self.assertEqual(cycled_z1.max_hr, default_z1.max_hr)
+
+	def test_add_new_activity_config_copies_defaults(self) -> None:
+		# Set up DB
+		activity_to_add = ActivityType.RIDE.value  # type: ignore[attr-defined]
+		CustomZonesConfig.objects.filter(
+			user=self.strava_user, activity_type=activity_to_add
+		).delete()
+		self.assertFalse(
+			CustomZonesConfig.objects.filter(
+				user=self.strava_user, activity_type=activity_to_add
+			).exists()
+		)
+
+		form_data = {
+			"action": "add_new_activity_config",
+			"new_activity_type": activity_to_add,
+		}
+		request_obj, response = self._make_post_request_to_view(self.user, form_data, self.view)
+		self.assertEqual(response.status_code, 302)
+		messages = list(get_messages(request_obj))
+		self.assertTrue(
+			any(
+				f"Configuration for {ActivityType(activity_to_add).label} added" in str(m)
+				for m in messages
+			)
+		)
+
+		new_config = CustomZonesConfig.objects.get(
+			user=self.strava_user, activity_type=activity_to_add
+		)
+		self.assertIsNotNone(new_config)
+		self.assertEqual(
+			new_config.zones_definition.count(), self.default_config.zones_definition.count()
+		)
+		self.assertEqual(
+			new_config.zones_definition.get(order=1).name,
+			self.default_config.zones_definition.get(order=1).name,
+		)
+
+	def test_add_new_activity_config_already_exists(self) -> None:
+		activity_to_add = ActivityType.RUN.value  # type: ignore[attr-defined]
+		form_data = {
+			"action": "add_new_activity_config",
+			"new_activity_type": activity_to_add,
+		}
+		request_obj, response = self._make_post_request_to_view(self.user, form_data, self.view)
+		self.assertEqual(response.status_code, 302)
+		messages = list(get_messages(request_obj))
+		self.assertTrue(any("already exists" in str(m) for m in messages))
+		self.assertEqual(
+			CustomZonesConfig.objects.filter(
+				user=self.strava_user, activity_type=activity_to_add
+			).count(),
+			1,
+		)
+
+	def test_add_new_activity_config_invalid_type(self) -> None:
+		form_data = {
+			"action": "add_new_activity_config",
+			"new_activity_type": "INVALID_TYPE",
+		}
+		request_obj, response = self._make_post_request_to_view(self.user, form_data, self.view)
+		self.assertEqual(response.status_code, 302)
+		messages = list(get_messages(request_obj))
+		self.assertTrue(any("Invalid activity type selected" in str(m) for m in messages))
+
+	def test_add_new_activity_config_add_default_again(self) -> None:
+		form_data = {
+			"action": "add_new_activity_config",
+			"new_activity_type": ActivityType.DEFAULT.value,  # type: ignore[attr-defined]
+		}
+		request_obj, response = self._make_post_request_to_view(self.user, form_data, self.view)
+		self.assertEqual(response.status_code, 302)
+		messages = list(get_messages(request_obj))
+		self.assertTrue(any("DEFAULT cannot be added again" in str(m) for m in messages))
+
+	def test_delete_activity_config(self) -> None:
+		"""Test deleting an activity-specific HR zone configuration."""
+		self.client.login(username="testuserdisplayview", password="password")
+
+		# Ensure the running config exists before deletion
+		self.assertTrue(CustomZonesConfig.objects.filter(id=self.running_config.id).exists())
+		running_config_id = self.running_config.id
+		initial_config_count = CustomZonesConfig.objects.filter(user=self.strava_user).count()
+
+		response = self.client.post(
+			self.url,
+			{
+				"action": "delete_activity_config",
+				"config_id_to_delete": str(running_config_id),
+			},
+		)
+
+		self.assertEqual(response.status_code, 302)  # Should redirect
+
+		# Check that the running config is deleted
+		self.assertFalse(CustomZonesConfig.objects.filter(id=running_config_id).exists())
+
+		# Check that other configs (e.g., default) still exist
+		self.assertTrue(CustomZonesConfig.objects.filter(id=self.default_config.id).exists())
+		self.assertTrue(CustomZonesConfig.objects.filter(id=self.cycling_config.id).exists())
+
+		# Check that the total count of configs for the user has decreased by one
+		self.assertEqual(
+			CustomZonesConfig.objects.filter(user=self.strava_user).count(),
+			initial_config_count - 1,
+		)
+
+		# Check for success message
+		messages = list(get_messages(response.wsgi_request))
+		self.assertEqual(len(messages), 1)
+		# The display name for ActivityType.RUN is 'Run'
+		self.assertEqual(str(messages[0]), "Successfully deleted the 'Run' configuration.")
+
+	def test_delete_default_activity_config_attempt(self) -> None:
+		"""Test attempting to delete the DEFAULT HR zone configuration."""
+		self.client.login(username="testuserdisplayview", password="password")
+
+		default_config_id = self.default_config.id
+		initial_config_count = CustomZonesConfig.objects.filter(user=self.strava_user).count()
+
+		response = self.client.post(
+			self.url,
+			{
+				"action": "delete_activity_config",
+				"config_id_to_delete": str(default_config_id),
+			},
+		)
+
+		self.assertEqual(response.status_code, 302)  # Should redirect
+
+		# Check that the default config is NOT deleted
+		self.assertTrue(CustomZonesConfig.objects.filter(id=default_config_id).exists())
+		self.assertEqual(
+			CustomZonesConfig.objects.filter(user=self.strava_user).count(),
+			initial_config_count,  # Count should remain the same
+		)
+
+		# Check for error message
+		messages = list(get_messages(response.wsgi_request))
+		self.assertEqual(len(messages), 1)
+		self.assertEqual(str(messages[0]), "The 'Default' configuration cannot be deleted.")
