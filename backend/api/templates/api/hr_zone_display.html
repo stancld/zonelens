@@ -153,61 +153,73 @@ nav {
 
         {% if error_message %}
             <p class="error-message">{{ error_message }}</p>
-        {% elif custom_zones_config %}
-            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
-                <h2 style="margin:0;">Configuration: {% if custom_zones_config.config_name %}{{ custom_zones_config.config_name }} - {% endif %}{{ custom_zones_config.get_activity_type_display|default:custom_zones_config.activity_type }}</h2>
-                {% if custom_zones_config.activity_type == "DEFAULT" %}
-                <button id="addActivityConfigButton" title="Add activity-specific configuration" style="display:inline-flex; align-items:center; justify-content:center; width:22px; height:22px; background-color:#FC4C02; color:white; border:none; border-radius:50%; font-size:14px; font-weight:600; line-height:1; cursor:pointer;">+</button>
-                {% endif %}
-            </div>
+        {% elif user_zone_configurations %}
+            {% with first_config_data=user_zone_configurations.0 %}
+                {% if first_config_data and first_config_data.config %}
+                    <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
+                        <h2 style="margin:0;">Configuration: {% if first_config_data.config.config_name %}{{ first_config_data.config.config_name }} - {% endif %}{{ first_config_data.config.get_activity_type_display|default:first_config_data.config.activity_type }}</h2>
+                        {% if first_config_data.config.activity_type == "DEFAULT" %}
+                        <button id="addActivityConfigButton" title="Add activity-specific configuration" style="display:inline-flex; align-items:center; justify-content:center; width:22px; height:22px; background-color:#FC4C02; color:white; border:none; border-radius:50%; font-size:14px; font-weight:600; line-height:1; cursor:pointer;">+</button>
+                        {% endif %}
+                    </div>
 
-            {% if hr_zones %}
-                <form id="hrZoneForm" method="POST">
-                    {% csrf_token %}
-                    {% if custom_zones_config %}
-                    <input type="hidden" id="config_id" name="config_id" value="{{ custom_zones_config.id }}">
-                    <input type="hidden" id="activity_type" name="activity_type" value="{{ custom_zones_config.activity_type }}">
+                    {% if first_config_data.zones %}
+                        <form id="hrZoneForm" method="POST">
+                            {% csrf_token %}
+                            <input type="hidden" id="config_id" name="config_id" value="{{ first_config_data.config.id }}">
+                            <input type="hidden" id="activity_type" name="activity_type" value="{{ first_config_data.config.activity_type }}">
+                        <table class="hr-zones-table">
+                            <thead>
+                                <tr>
+                                    <th>Zone Name</th>
+                                    <th>Min HR (bpm)</th>
+                                    <th>Max HR (bpm)</th>
+                                </tr>
+                            </thead>
+                            <tbody id="hrZonesTableBody">
+                                {% for zone in first_config_data.zones %}
+                                <tr class="zone-row zone-{{ forloop.counter }}" data-zone-order="{{ forloop.counter }}">
+                                    <td>
+                                        <input type="text" name="zone_name_{{ forloop.counter }}" value="{{ zone.name }}" class="zone-name-input" style="width:120px; padding: 6px; border: 1px solid #ccc; border-radius: 4px;" required>
+                                        <input type="hidden" name="zone_order_{{ forloop.counter }}" value="{{ forloop.counter }}">
+                                    </td>
+                                    <td>
+                                        <span id="min-hr-display-{{ forloop.counter }}" class="min-hr-display" style="padding: 6px;">
+                                            {% if forloop.first %}0{% else %}{{ zone.min_hr }}{% endif %}
+                                        </span>
+                                        <input type="hidden" id="zone_min_hr_input_{{ forloop.counter }}" name="zone_min_hr_{{ forloop.counter }}" value="{% if forloop.first %}0{% else %}{{ zone.min_hr }}{% endif %}">
+                                    </td>
+                                    <td>
+                                        <input type="number" name="zone_max_hr_{{ forloop.counter }}" class="zone-max-hr-input" style="width:100px; padding: 6px; border: 1px solid #ccc; border-radius: 4px;"
+                                               value="{% if zone.max_hr and zone.max_hr != 0 and zone.max_hr != 999 %}{{ zone.max_hr }}{% endif %}"
+                                               placeholder="{% if zone.max_hr == 999 %}e.g. 220{% elif not zone.max_hr or zone.max_hr == 0 %}e.g. 120{% endif %}"
+                                               min="1">
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                        <div style="margin-top: 20px; margin-bottom: 15px;">
+                            <button type="submit" id="saveHrZonesButton" class="strava-button">Save Changes</button>
+                        </div>
+                        </form>
+                    {% else %}
+                         <p>This configuration ({{ first_config_data.config.get_activity_type_display|default:first_config_data.config.activity_type }}) has no heart rate zones defined yet.</p>
+                         {% if first_config_data.config.activity_type == "DEFAULT" %}
+                             <p>You can try <button type="button" id="fetchStravaHrZonesButton" style="padding: 5px 10px; font-size: 14px; background-color: #FC4C02; color: white; border: none; border-radius: 4px; cursor: pointer;">fetching from Strava</button> to populate them.</p>
+                         {% else %}
+                              <p>You can add zones manually or copy from your default configuration if available.</p>
+                         {% endif %}
                     {% endif %}
-                <table class="hr-zones-table">
-                    <thead>
-                        <tr>
-                            <th>Zone Name</th>
-                            <th>Min HR (bpm)</th>
-                            <th>Max HR (bpm)</th>
-                        </tr>
-                    </thead>
-                    <tbody id="hrZonesTableBody">
-                        {% for zone in hr_zones %}
-                        <tr class="zone-row zone-{{ forloop.counter }}" data-zone-order="{{ forloop.counter }}">
-                            <td>
-                                <input type="text" name="zone_name_{{ forloop.counter }}" value="{{ zone.name }}" class="zone-name-input" style="width:120px; padding: 6px; border: 1px solid #ccc; border-radius: 4px;" required>
-                                <input type="hidden" name="zone_order_{{ forloop.counter }}" value="{{ forloop.counter }}">
-                            </td>
-                            <td>
-                                <span id="min-hr-display-{{ forloop.counter }}" class="min-hr-display" style="padding: 6px;">
-                                    {% if forloop.first %}0{% else %}{{ zone.min_hr }}{% endif %}
-                                </span>
-                                <input type="hidden" id="zone_min_hr_input_{{ forloop.counter }}" name="zone_min_hr_{{ forloop.counter }}" value="{% if forloop.first %}0{% else %}{{ zone.min_hr }}{% endif %}">
-                            </td>
-                            <td>
-                                <input type="number" name="zone_max_hr_{{ forloop.counter }}" class="zone-max-hr-input" style="width:100px; padding: 6px; border: 1px solid #ccc; border-radius: 4px;"
-                                       value="{% if zone.max_hr and zone.max_hr != 0 and zone.max_hr != 999 %}{{ zone.max_hr }}{% endif %}"
-                                       placeholder="{% if zone.max_hr == 999 %}e.g. 220{% elif not zone.max_hr or zone.max_hr == 0 %}e.g. 120{% endif %}"
-                                       min="1">
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-                <div style="margin-top: 20px; margin-bottom: 15px;">
-                    <button type="submit" id="saveHrZonesButton" class="strava-button">Save Changes</button>
-                </div>
-                </form>
-            {% else %}
-                <p class="info-message">No heart rate zones are defined for the '{{ custom_zones_config.config_name }}' configuration.</p>
-            {% endif %}
+                {% else %}
+                    <p class="info-message">No heart rate zone configurations available to display at the moment.</p>
+                    {% if not error_message %}
+                        <p>Please try setting up a configuration or ensure your Strava account is connected.</p>
+                    {% endif %}
+                {% endif %}
+            {% endwith %}
         {% else %}
-            <p class="info-message">No custom heart rate zone configuration found. You can set one up in your profile settings.</p>
+            <p class="info-message">No heart rate zone configurations found. You can <a href="{% url 'strava_auth' %}?next={{ request.path }}">connect your Strava account</a> or set them up manually if supported.</p>
         {% endif %}
 
         <div style="margin-top: 20px;">

@@ -32,7 +32,7 @@ from api.utils import encrypt_data
 from api.worker import StravaHRWorker
 
 if TYPE_CHECKING:
-	from typing import TypedDict
+	from typing import Any, TypedDict
 
 	from django.db.models import QuerySet
 	from rest_framework.request import Request
@@ -417,45 +417,62 @@ class UserHRZonesDisplayView(TemplateView):
 
 	permission_classes = [IsAuthenticated]
 
-	def get_context_data(self, **kwargs) -> dict:
+	def get_context_data(self, **kwargs: Any) -> dict:
 		context = super().get_context_data(**kwargs)
 		user = self.request.user
-		custom_zones_config = None
-		hr_zones = []
+
+		user_configs_data = []
 		error_message = None
+		existing_activities = []
 
 		if user.is_authenticated:
 			try:
-				custom_zones_config = CustomZonesConfig.objects.filter(
-					user=user.strava_profile, activity_type=ActivityType.DEFAULT
-				).first()
+				strava_user = user.strava_profile
 
-				if custom_zones_config:
-					hr_zones = HeartRateZone.objects.filter(config=custom_zones_config).order_by(
-						"min_hr"
+				# Fetch all configs for the user, with prefetch for zones
+				all_user_configs_qs = CustomZonesConfig.objects.filter(
+					user=strava_user
+				).prefetch_related("zones_definition")
+
+				def sort_key(config_obj):
+					# Sorts DEFAULT config first, then by activity_type value, then created_at
+					if config_obj.activity_type == ActivityType.DEFAULT:
+						return (0, config_obj.created_at)
+					# Fallback to string of activity_type if .value is not present
+					activity_sort_val = getattr(
+						config_obj.activity_type, "value", str(config_obj.activity_type)
 					)
-					if not hr_zones:
-						logger.info(f"U:{user.id} Cfg:{custom_zones_config.id} NoHRZ")
+					return (1, activity_sort_val, config_obj.created_at)
+
+				sorted_configs = sorted(all_user_configs_qs, key=sort_key)
+
+				if sorted_configs:
+					for config_item in sorted_configs:
+						zones = sorted(config_item.zones_definition.all(), key=lambda z: z.min_hr)
+						user_configs_data.append({"config": config_item, "zones": zones})
 				else:
-					error_message = "No custom HR zone config. Please set one up."
+					error_message = "No custom HR zone configurations found. Please set one up."
+
+				# Populate existing_activities
+				#  (used for UI hints, e.g., which activities already have configs)
+				existing_activities = CustomZonesConfig.objects.filter(
+					user=strava_user
+				).values_list("activity_type", flat=True)
 
 			except StravaUser.DoesNotExist:
 				error_message = (
 					"Strava profile not found. Cannot fetch custom zone configurations."
 				)
 			except Exception as e:
+				logger.exception(
+					f"Error fetching/processing custom HR zones for user {user.id}: {e!r}"
+				)
 				error_message = "An unexpected error occurred while fetching your custom HR zones."
-				logger.error(f"Error fetching custom HR zones for user {user.id}: {e!r}")
+				# Consider clearing user_configs_data = [] here if partial data is problematic
 		else:
 			error_message = "User not authenticated."
 
-		context["custom_zones_config"] = custom_zones_config
-		context["hr_zones"] = hr_zones
+		context["user_zone_configurations"] = user_configs_data
 		context["error_message"] = error_message
-		existing = list(
-			CustomZonesConfig.objects.filter(user=user.strava_profile).values_list(
-				"activity_type", flat=True
-			)
-		)
-		context["existing_activity_types_json"] = json.dumps(existing)
+		context["existing_activity_types_json"] = json.dumps(list(existing_activities))
 		return context

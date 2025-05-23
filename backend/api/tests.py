@@ -9,7 +9,7 @@ from urllib.parse import urlparse
 import pytz
 import requests_mock
 from django.contrib.auth import get_user_model
-from django.test import TestCase, override_settings
+from django.test import RequestFactory, TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 from rest_framework import status
@@ -38,7 +38,10 @@ from api.strava_client import (
 	StravaApiClient,
 )
 from api.utils import decrypt_data, encrypt_data
+from api.views import UserHRZonesDisplayView
 from api.worker import StravaHRWorker
+
+User = get_user_model()
 
 
 class InitialMigrationTests(TestCase):
@@ -1367,3 +1370,177 @@ class ZoneSummaryModelTests(TestCase):
 			self.assertEqual(summary_no_context.zone_times_seconds, {"Z1 Jan": 100, "Z1 Feb": 200})
 			# Ensure it's still the same DB object
 			self.assertEqual(summary_jan_context.pk, summary_no_context.pk)  # type: ignore[union-attr]
+
+
+class TestUserHRZonesDisplayView(TestCase):
+	def setUp(self):
+		self.factory = RequestFactory()
+		self.user = User.objects.create_user(username="testuserdisplayview", password="password")
+		# StravaUser's PK is strava_id. Ensure unique strava_id for tests.
+		self.strava_user = StravaUser.objects.create(
+			strava_id=123456,
+			user=self.user,
+			# Providing a valid datetime string for token_expires_at
+			# You might need to adjust this based on your StravaUser model's expectations
+			# or use timezone.now() if appropriate.
+			token_expires_at="2025-12-31T23:59:59Z",
+		)
+		self.view = UserHRZonesDisplayView()
+
+	def _get_view_context(self, user_obj):
+		request = self.factory.get(reverse("user_hr_zones_display"))
+		request.user = user_obj
+		# The view instance needs the request attached to it
+		self.view.setup(request)  # Django's View class has a setup method
+		return self.view.get_context_data()
+
+	def test_get_context_data_unauthenticated(self):
+		# Create a mock AnonymousUser or a User instance with is_authenticated=False
+		from django.contrib.auth.models import AnonymousUser
+
+		unauthenticated_user = AnonymousUser()
+
+		context = self._get_view_context(unauthenticated_user)
+		self.assertEqual(context.get("user_zone_configurations", None), [])  # Should be empty list
+		self.assertEqual(context.get("error_message"), "User not authenticated.")
+
+	def test_get_context_data_authenticated_strava_user_does_not_exist(self):
+		# Create a user that does not have an associated StravaUser profile
+		no_strava_profile_user = User.objects.create_user(
+			username="nostravauser", password="password"
+		)
+		context = self._get_view_context(no_strava_profile_user)
+		self.assertEqual(context.get("user_zone_configurations", []), [])
+		self.assertEqual(
+			context.get("error_message"),
+			"Strava profile not found. Cannot fetch custom zone configurations.",
+		)
+
+	def test_get_context_data_authenticated_no_configs(self):
+		context = self._get_view_context(self.user)
+		self.assertEqual(context.get("user_zone_configurations"), [])
+		self.assertEqual(
+			context.get("error_message"),
+			"No custom HR zone configurations found. Please set one up.",
+		)
+		# Ensure existing_activity_types_json is an empty list in JSON format
+		self.assertEqual(json.loads(context.get("existing_activity_types_json")), [])
+
+	def test_get_context_data_authenticated_with_default_config_no_zones(self):
+		config = CustomZonesConfig.objects.create(
+			user=self.strava_user, activity_type=ActivityType.DEFAULT
+		)
+		context = self._get_view_context(self.user)
+
+		self.assertEqual(len(context.get("user_zone_configurations")), 1)
+		config_data = context["user_zone_configurations"][0]
+		self.assertEqual(config_data["config"], config)
+		self.assertEqual(config_data["zones"], [])  # Should be an empty list
+		self.assertIsNone(context.get("error_message"))
+		self.assertEqual(
+			json.loads(context.get("existing_activity_types_json")), [ActivityType.DEFAULT.value]
+		)
+
+	def test_get_context_data_authenticated_with_default_config_and_zones(self):
+		config = CustomZonesConfig.objects.create(
+			user=self.strava_user, activity_type=ActivityType.DEFAULT
+		)
+		# The view sorts by min_hr.
+		zone1 = HeartRateZone.objects.create(
+			config=config, name="Z1", min_hr=0, max_hr=120, order=1
+		)
+		zone2 = HeartRateZone.objects.create(
+			config=config, name="Z2", min_hr=121, max_hr=150, order=2
+		)
+
+		context = self._get_view_context(self.user)
+		self.assertEqual(len(context.get("user_zone_configurations")), 1)
+		config_data = context["user_zone_configurations"][0]
+		self.assertEqual(config_data["config"], config)
+		self.assertEqual(len(config_data["zones"]), 2)
+		# View sorts zones by min_hr
+		self.assertEqual(list(config_data["zones"]), [zone1, zone2])
+		self.assertIsNone(context.get("error_message"))
+
+	def test_get_context_data_authenticated_with_multiple_configs_and_zones_sorted(self):
+		# Create configs in an order that tests the view's sorting logic
+		config_run = CustomZonesConfig.objects.create(
+			user=self.strava_user, activity_type=ActivityType.RUN
+		)
+		HeartRateZone.objects.create(
+			config=config_run, name="RunZ1", min_hr=100, max_hr=130, order=1
+		)
+
+		config_default = CustomZonesConfig.objects.create(
+			user=self.strava_user, activity_type=ActivityType.DEFAULT
+		)
+		zone_d1 = HeartRateZone.objects.create(
+			config=config_default, name="DefZ1", min_hr=0, max_hr=110, order=1
+		)
+		zone_d2 = HeartRateZone.objects.create(
+			config=config_default, name="DefZ2", min_hr=111, max_hr=140, order=2
+		)
+
+		config_ride = CustomZonesConfig.objects.create(
+			user=self.strava_user, activity_type=ActivityType.RIDE
+		)
+		HeartRateZone.objects.create(
+			config=config_ride, name="RideZ1", min_hr=90, max_hr=120, order=1
+		)
+
+		context = self._get_view_context(self.user)
+
+		self.assertEqual(len(context.get("user_zone_configurations")), 3)
+		configs_in_context = [cd["config"] for cd in context["user_zone_configurations"]]
+
+		# Verify DEFAULT config is first
+		self.assertEqual(configs_in_context[0], config_default)
+
+		# Verify subsequent configs are sorted by activity_type.value (e.g., 'RUN' then 'RIDE')
+		# The exact order of RUN and RIDE depends on their string values.
+		# Assuming ActivityType.RUN.value ('RUN') < ActivityType.RIDE.value ('RIDE')
+		remaining_configs_sorted_by_view = [configs_in_context[1], configs_in_context[2]]
+		expected_remaining_sorted = sorted(
+			[config_run, config_ride], key=lambda c: c.activity_type.value
+		)
+		self.assertEqual(remaining_configs_sorted_by_view, expected_remaining_sorted)
+
+		# Verify zones within the default config are sorted
+		default_config_data = next(
+			cd for cd in context["user_zone_configurations"] if cd["config"] == config_default
+		)
+		self.assertEqual(list(default_config_data["zones"]), [zone_d1, zone_d2])
+		self.assertIsNone(context.get("error_message"))
+
+		# Check existing_activity_types_json
+		expected_activity_types = sorted(
+			[ActivityType.DEFAULT.value, ActivityType.RUN.value, ActivityType.RIDE.value]
+		)
+		self.assertEqual(
+			sorted(json.loads(context.get("existing_activity_types_json"))),
+			expected_activity_types,
+		)
+
+	def test_get_context_data_zone_sorting_within_config_by_min_hr(self):
+		config = CustomZonesConfig.objects.create(
+			user=self.strava_user, activity_type=ActivityType.DEFAULT
+		)
+		# Create zones out of min_hr order to explicitly test sorting by min_hr
+		zone_b_min_hr_150 = HeartRateZone.objects.create(
+			config=config, name="Zone B", min_hr=150, max_hr=170, order=2
+		)
+		zone_a_min_hr_120 = HeartRateZone.objects.create(
+			config=config, name="Zone A", min_hr=120, max_hr=149, order=1
+		)
+		zone_c_min_hr_171 = HeartRateZone.objects.create(
+			config=config, name="Zone C", min_hr=171, max_hr=190, order=3
+		)
+
+		context = self._get_view_context(self.user)
+		self.assertEqual(len(context.get("user_zone_configurations")), 1)
+		config_data = context["user_zone_configurations"][0]
+
+		# Zones should be sorted by min_hr as per the view's logic
+		self.assertEqual(
+			list(config_data["zones"]), [zone_a_min_hr_120, zone_b_min_hr_150, zone_c_min_hr_171]
+		)
