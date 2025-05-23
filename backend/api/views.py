@@ -330,6 +330,21 @@ class ZoneSummaryView(APIView):
 
 		weekly_serializer = ZoneSummarySerializer(weekly_summaries, many=True)
 
+		zone_definitions_map = {}
+		try:
+			# Get the DEFAULT custom zones configuration for the user - Names are shared
+			default_config = CustomZonesConfig.objects.prefetch_related("zones_definition").get(
+				user=user_profile, activity_type=ActivityType.DEFAULT
+			)
+			for zone_model_instance in default_config.zones_definition.all():
+				zone_key = f"zone{zone_model_instance.order}"
+				zone_definitions_map[zone_key] = zone_model_instance.name
+		except CustomZonesConfig.DoesNotExist:
+			logger.warning(
+				f"No DEFAULT CustomZonesConfig found for user {user_profile.strava_id}. "
+				f"Frontend will use fallback zone names."
+			)
+
 		return Response(
 			{
 				"message": "Zone summary data retrieved successfully.",
@@ -337,6 +352,7 @@ class ZoneSummaryView(APIView):
 				"month": month,
 				"monthly_summary": monthly_serializer.data,
 				"weekly_summaries": weekly_serializer.data,
+				"zone_definitions": zone_definitions_map,
 			},
 			status=status.HTTP_200_OK,
 		)

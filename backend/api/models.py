@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 import uuid
+from collections import OrderedDict
 from typing import ClassVar
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import models
-from django.db.models import Sum
+from django.db.models import OuterRef, Subquery, Sum
 from django.utils import timezone
 
 from api.logging import get_logger
@@ -179,18 +180,33 @@ class ZoneSummary(models.Model):
 			if current_month_view:  # Apply month context if provided for weekly
 				activity_filters["activity_date__month"] = current_month_view
 
-		# Always calculate what the zone times should be based on these filters
-		aggregated_times = (
-			ActivityZoneTimes.objects.filter(**activity_filters)
-			.values("zone_name")
-			.annotate(total_duration=Sum("duration_seconds"))
-			.order_by("zone_name")
+		try:
+			default_config = CustomZonesConfig.objects.get(
+				user=user_profile, activity_type=ActivityType.DEFAULT
+			)
+			hr_zone_order_subquery = HeartRateZone.objects.filter(
+				config=default_config, name=OuterRef("zone_name")
+			).values("order")[:1]
+
+			aggregated_times = (
+				ActivityZoneTimes.objects.filter(**activity_filters)
+				.values("zone_name")
+				.annotate(
+					total_duration=Sum("duration_seconds"),
+					zone_order=Subquery(hr_zone_order_subquery),
+				)
+				.order_by("zone_order", "zone_name")
+			)
+		except CustomZonesConfig.DoesNotExist as e:
+			raise ValueError("Default CustomZonesConfig not found for user") from e
+
+		calculated_zone_times = OrderedDict(
+			{
+				item["zone_name"]: item["total_duration"]
+				for item in aggregated_times
+				if item["total_duration"]
+			}
 		)
-		calculated_zone_times = {
-			item["zone_name"]: item["total_duration"]
-			for item in aggregated_times
-			if item["total_duration"] and item["total_duration"] > 0
-		}
 
 		# Update and save only if newly created or if calculated times differ from stored times
 		if created or summary.zone_times_seconds != calculated_zone_times:
