@@ -148,7 +148,7 @@ nav {
         }
     </style>
 
-    <div class="container"> <!-- This container class might be provided by base.html -->
+    <div class="container">
         <h1>Your Custom Heart Rate Zones</h1>
 
         {% if error_message %}
@@ -168,7 +168,6 @@ nav {
                     <input type="hidden" id="config_id" name="config_id" value="{{ custom_zones_config.id }}">
                     <input type="hidden" id="activity_type" name="activity_type" value="{{ custom_zones_config.activity_type }}">
                     {% endif %}
-                    <h3>Heart Rate Zones:</h3>
                 <table class="hr-zones-table">
                     <thead>
                         <tr>
