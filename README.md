@@ -19,7 +19,7 @@ The main aim is to provide a visual representation of time spent in different HR
 
 This is an **experimental project** primarily developed as an exercise in **"vibe-coding"** – rapidly iterating and building features with a focus on learning and exploration rather than achieving maximum efficiency or a production-ready state. As such, some design choices or implementation details might reflect this learning process.
 
-## 📸 Current State (as of May 16, 2025)
+## 📸 Current State (as of May 23, 2025)
 
 ![Current WIP Calendar Screenshot](images/wip_calendar_250516.png)
 
