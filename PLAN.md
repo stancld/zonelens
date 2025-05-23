@@ -97,8 +97,6 @@ This file outlines the development steps and serves as a checklist to track prog
 - [x] Improve UI/UX of the extension popup (styling to match Strava, dynamic status messages).
 - [ ] Improve UI/UX of the options page and injected plots.
 - [x] Use environment variable for `CHROME_EXTENSION_ID` in `CSRF_TRUSTED_ORIGINS` (`settings.py`).
-- [ ] Add backend tests (unit/integration, especially for processing logic).
-- [ ] Add frontend tests (optional).
 - [ ] Consider optimisations for data fetching and processing.
 
 ## Phase 6: Production-Level Deployment (AWS Free Tier)
