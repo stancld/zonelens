@@ -39,46 +39,89 @@ nav {
 
         .hr-zones-table {
             width: 100%;
-            max-width: 600px;
             border-collapse: collapse;
-            margin-top: 15px;
-            margin-bottom: 25px;
-            font-size: 14px;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-            border-radius: 4px;
-            overflow: hidden;
+            margin-top: 10px; /* Added margin for spacing */
         }
 
         .hr-zones-table th,
         .hr-zones-table td {
-            border: none;
-            border-bottom: 1px solid #e5e5e5;
-            padding: 12px 15px;
+            padding: 10px; /* Increased padding */
             text-align: left;
-            vertical-align: middle;
+            border-bottom: 1px solid #e0e0e0; /* Lighter border for rows */
         }
 
+        /* Remove top/bottom border from header/footer cells if table has outer border */
+        .hr-zones-table thead th { border-bottom-width: 2px; } /* Stronger header underline */
+        .hr-zones-table tbody tr:last-child td { border-bottom: none; }
+
         .hr-zones-table th {
-            background-color: #f9f9f9;
-            color: #555;
-            font-weight: 600;
+            background-color: #f7f7f7; /* Lighter header background */
+            color: #333;
+            font-weight: 600; /* Adjusted font-weight */
             text-transform: uppercase;
-            font-size: 12px;
-            letter-spacing: 0.5px;
+            font-size: 12px; /* Maintained from original */
+            letter-spacing: 0.5px; /* Maintained from original */
         }
-        .hr-zones-table tr:last-child td {
-            border-bottom: none;
+
+        .zone-color-header-cell {
+            width: 6px; /* Further reduced width for thinner bar */
+            padding: 10px 0 !important; /* Remove padding for color bar header */
+        }
+        .zone-color-cell {
+            width: 6px; /* Further reduced width for thinner bar */
+            padding: 0 !important; /* Remove padding so background color fills it */
+            border-bottom: 1px solid #e0e0e0; /* Ensure border matches rest of row */
+        }
+
+        .hr-zones-table td:nth-child(3), /* Min HR column */
+        .hr-zones-table td:nth-child(4) { /* Max HR column */
+            text-align: right;
+        }
+
+        .hr-zones-table input[type="text"],
+        .hr-zones-table input[type="number"] {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+
+        .hr-zones-table input[type="number"] {
+            text-align: right;
+            max-width: 80px; /* Constrain width of HR inputs */
+        }
+        .hr-zones-table span.min-hr-display {
+            text-align: right;
+            display: block;
+            padding: 8px 0; /* Match input padding */
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        /* CSS-based zone coloring */
+        .hr-zones-table tbody tr:nth-child(5n+1) .zone-color-cell { background-color: #757575; } /* Grey (from --zone1-color) */
+        .hr-zones-table tbody tr:nth-child(5n+2) .zone-color-cell { background-color: #1E88E5; } /* Blue (from --zone2-color) */
+        .hr-zones-table tbody tr:nth-child(5n+3) .zone-color-cell { background-color: #7CB342; } /* Green (from --zone3-color) */
+        .hr-zones-table tbody tr:nth-child(5n+4) .zone-color-cell { background-color: #FB8C00; } /* Orange (from --zone4-color) */
+        .hr-zones-table tbody tr:nth-child(5n+0) .zone-color-cell { background-color: #E53935; } /* Red (from --zone5-color) */
+
+        .read-only-text,
+        .min-hr-display,
+        .hr-zones-table input[readonly] {
+            font-size: 0.85em; /* Smaller font for read-only elements */
+            color: #555; /* Slightly muted color for read-only text */
         }
 
         /* Zone-specific row styling */
         .zone-row {
             border-left: 10px solid transparent;
         }
-        .zone-1 { border-left-color: #6D6D6D; } /* Zone 1: Grey */
-        .zone-2 { border-left-color: #0077CC; } /* Zone 2: Blue */
-        .zone-3 { border-left-color: #5E9E00; } /* Zone 3: Green */
-        .zone-4 { border-left-color: #FF9900; } /* Zone 4: Orange/Yellow */
-        .zone-5 { border-left-color: #E60000; } /* Zone 5: Red */
+        .zone-1 { border-left-color: #757575; } /* Zone 1: Grey */
+        .zone-2 { border-left-color: #1E88E5; } /* Zone 2: Blue */
+        .zone-3 { border-left-color: #7CB342; } /* Zone 3: Green */
+        .zone-4 { border-left-color: #FB8C00; } /* Zone 4: Orange/Yellow */
+        .zone-5 { border-left-color: #E53935; } /* Zone 5: Red */
         .zone-6 { border-left-color: #333333; } /* Zone 6 (if exists) */
 
         #fetchStravaHrZonesButton {
@@ -126,6 +169,13 @@ nav {
             border: 1px solid #270; /* Dark Green border */
         }
 
+        .container {
+            max-width: 2000px; /* Allow it to be wider than default */
+            width: fit-content; /* Try to fit its content's width */
+            margin-left: auto; /* Keep it centered if it doesn't fill viewport */
+            margin-right: auto; /* Keep it centered if it doesn't fill viewport */
+        }
+
         .container a, p a {
             color: #0077CC;
             text-decoration: none;
@@ -154,70 +204,89 @@ nav {
         {% if error_message %}
             <p class="error-message">{{ error_message }}</p>
         {% elif user_zone_configurations %}
-            {% with first_config_data=user_zone_configurations.0 %}
-                {% if first_config_data and first_config_data.config %}
-                    <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
-                        <h2 style="margin:0;">Configuration: {% if first_config_data.config.config_name %}{{ first_config_data.config.config_name }} - {% endif %}{{ first_config_data.config.get_activity_type_display|default:first_config_data.config.activity_type }}</h2>
-                        {% if first_config_data.config.activity_type == "DEFAULT" %}
-                        <button id="addActivityConfigButton" title="Add activity-specific configuration" style="display:inline-flex; align-items:center; justify-content:center; width:22px; height:22px; background-color:#FC4C02; color:white; border:none; border-radius:50%; font-size:14px; font-weight:600; line-height:1; cursor:pointer;">+</button>
+            <form method="POST" id="hr-zones-form">
+                {% csrf_token %}
+                <input type="hidden" id="form-action-input" name="action" value="">
+                <div style="display: flex; gap: 20px; align-items: flex-start; overflow-x: auto; padding-bottom: 10px;">
+                    {% for config_data in user_zone_configurations %}
+                    <div class="config-column" style="border: 1px solid #ddd; padding: 15px; border-radius: 8px; background-color: #f9f9f9; min-width: 280px; flex-shrink: 0;">
+                        <input type="hidden" name="configs[{{ forloop.counter0 }}][id]" value="{{ config_data.config.id }}">
+                        <input type="hidden" name="configs[{{ forloop.counter0 }}][activity_type]" value="{{ config_data.config.activity_type }}">
+
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                            <h3 style="margin:0; color: #333;">{{ config_data.config.get_activity_type_display|default:config_data.config.activity_type }}</h3>
+                            {% if config_data.config.activity_type == "DEFAULT" %}
+                                <button type="button" id="addActivityConfigButton" title="Add activity-specific configuration" style="display:inline-flex; align-items:center; justify-content:center; width:22px; height:22px; background-color:#FC4C02; color:white; border:none; border-radius:50%; font-size:14px; font-weight:600; line-height:1; cursor:pointer;">+</button>
+                            {% endif %}
+                        </div>
+
+                        {% if not config_data.zones %}
+                             <p style="font-size: 0.9em; color: #555;">No heart rate zones defined.</p>
+                             {% if config_data.config.activity_type == "DEFAULT" %}
+                                 <button type="submit" name="action" value="add_default_zones_to_{{ config_data.config.id }}" class="save-button" style="font-size:0.85em; padding: 5px 10px; margin-top:5px;">Add Default 5 Zones</button>
+                             {% endif %}
+                        {% else %}
+                            <table class="hr-zones-table">
+                                <thead style="background-color: #f7f7f7; color: #333;">
+                                    <tr>
+                                        <th class="zone-color-header-cell"></th> {# Empty header for color bar column #}
+                                        <th style="padding:8px; text-align:left; font-weight:bold;">Zone Name</th>
+                                        <th style="padding:8px; text-align:left; font-weight:bold;">Min HR (BPM)</th>
+                                        <th style="padding:8px; text-align:left; font-weight:bold;">Max HR (BPM)</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="hrZonesTableBody-{{ config_data.config.id }}"> {# Unique ID for each table body #}
+                                    {% for zone in config_data.zones %}
+                                    <tr class="zone-row" data-config-id="{{ config_data.config.id }}" data-zone-order="{{ forloop.counter }}">
+                                        <td class="zone-color-cell"></td>
+                                        {# Hidden fields for each zone's ID and original order #}
+                                        <input type="hidden" name="configs[{{ forloop.parentloop.counter0 }}][zones][{{ forloop.counter0 }}][id]" value="{{ zone.id }}">
+                                        <input type="hidden" name="configs[{{ forloop.parentloop.counter0 }}][zones][{{ forloop.counter0 }}][order]" value="{{ zone.order }}">
+
+                                        <td style="padding:5px;">
+                                            {% if forloop.parentloop.first %}
+                                                <input type="text" name="configs[{{ forloop.parentloop.counter0 }}][zones][{{ forloop.counter0 }}][name]" value="{{ zone.name }}" class="zone-name-input" style="width:90%; padding: 6px; border: 1px solid #ccc; border-radius: 4px;" required>
+                                            {% else %}
+                                                <span class="read-only-text">{{ zone.name }}</span>
+                                                <input type="hidden" name="configs[{{ forloop.parentloop.counter0 }}][zones][{{ forloop.counter0 }}][name]" value="{{ zone.name }}">
+                                            {% endif %}
+                                        </td>
+                                        <td style="padding:5px;">
+                                            <span id="min-hr-display-{{ config_data.config.id }}-{{ forloop.counter }}" class="min-hr-display" style="padding: 6px; display:inline-block; min-width:20px; text-align:right;">
+                                                {% if forloop.first %}0{% else %}{{ zone.min_hr }}{% endif %}
+                                            </span>
+                                            <input type="hidden" name="configs[{{ forloop.parentloop.counter0 }}][zones][{{ forloop.counter0 }}][min_hr]" value="{% if forloop.first %}0{% else %}{{ zone.min_hr }}{% endif %}">
+                                        </td>
+                                        <td style="padding:5px;">
+                                            <input type="number" name="configs[{{ forloop.parentloop.counter0 }}][zones][{{ forloop.counter0 }}][max_hr]"
+                                                   class="zone-max-hr-input"
+                                                   style="width:70px; padding: 6px; border: 1px solid #ccc; border-radius: 4px; text-align:right;"
+                                                   value="{{ zone.max_hr }}"
+                                                   placeholder="Max HR"
+                                                   data-config-id="{{ config_data.config.id }}"
+                                                   data-zone-order="{{ forloop.counter }}"
+                                                   required min="1">
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
                         {% endif %}
                     </div>
+                    {% endfor %}
+                </div>
 
-                    {% if first_config_data.zones %}
-                        <form id="hrZoneForm" method="POST">
-                            {% csrf_token %}
-                            <input type="hidden" id="config_id" name="config_id" value="{{ first_config_data.config.id }}">
-                            <input type="hidden" id="activity_type" name="activity_type" value="{{ first_config_data.config.activity_type }}">
-                        <table class="hr-zones-table">
-                            <thead>
-                                <tr>
-                                    <th>Zone Name</th>
-                                    <th>Min HR (bpm)</th>
-                                    <th>Max HR (bpm)</th>
-                                </tr>
-                            </thead>
-                            <tbody id="hrZonesTableBody">
-                                {% for zone in first_config_data.zones %}
-                                <tr class="zone-row zone-{{ forloop.counter }}" data-zone-order="{{ forloop.counter }}">
-                                    <td>
-                                        <input type="text" name="zone_name_{{ forloop.counter }}" value="{{ zone.name }}" class="zone-name-input" style="width:120px; padding: 6px; border: 1px solid #ccc; border-radius: 4px;" required>
-                                        <input type="hidden" name="zone_order_{{ forloop.counter }}" value="{{ forloop.counter }}">
-                                    </td>
-                                    <td>
-                                        <span id="min-hr-display-{{ forloop.counter }}" class="min-hr-display" style="padding: 6px;">
-                                            {% if forloop.first %}0{% else %}{{ zone.min_hr }}{% endif %}
-                                        </span>
-                                        <input type="hidden" id="zone_min_hr_input_{{ forloop.counter }}" name="zone_min_hr_{{ forloop.counter }}" value="{% if forloop.first %}0{% else %}{{ zone.min_hr }}{% endif %}">
-                                    </td>
-                                    <td>
-                                        <input type="number" name="zone_max_hr_{{ forloop.counter }}" class="zone-max-hr-input" style="width:100px; padding: 6px; border: 1px solid #ccc; border-radius: 4px;"
-                                               value="{% if zone.max_hr and zone.max_hr != 0 and zone.max_hr != 999 %}{{ zone.max_hr }}{% endif %}"
-                                               placeholder="{% if zone.max_hr == 999 %}e.g. 220{% elif not zone.max_hr or zone.max_hr == 0 %}e.g. 120{% endif %}"
-                                               min="1">
-                                    </td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                        <div style="margin-top: 20px; margin-bottom: 15px;">
-                            <button type="submit" id="saveHrZonesButton" class="strava-button">Save Changes</button>
-                        </div>
-                        </form>
-                    {% else %}
-                         <p>This configuration ({{ first_config_data.config.get_activity_type_display|default:first_config_data.config.activity_type }}) has no heart rate zones defined yet.</p>
-                         {% if first_config_data.config.activity_type == "DEFAULT" %}
-                             <p>You can try <button type="button" id="fetchStravaHrZonesButton" style="padding: 5px 10px; font-size: 14px; background-color: #FC4C02; color: white; border: none; border-radius: 4px; cursor: pointer;">fetching from Strava</button> to populate them.</p>
-                         {% else %}
-                              <p>You can add zones manually or copy from your default configuration if available.</p>
-                         {% endif %}
-                    {% endif %}
-                {% else %}
-                    <p class="info-message">No heart rate zone configurations available to display at the moment.</p>
-                    {% if not error_message %}
-                        <p>Please try setting up a configuration or ensure your Strava account is connected.</p>
-                    {% endif %}
+                {% if user_zone_configurations %}
+                <div style="margin-top: 30px; padding-top:20px; border-top: 1px solid #eee; text-align: center;">
+                    <button type="button" id="save-all-changes-button"
+                            style="background-color: #f0f0f0; color: #333; border: 1px solid #ccc;
+                                   padding: 10px 20px; font-size: 1em; border-radius: 4px;
+                                   cursor: pointer; font-weight: bold;">
+                        Save All Changes
+                    </button>
+                </div>
                 {% endif %}
-            {% endwith %}
+            </form>
         {% else %}
             <p class="info-message">No heart rate zone configurations found. You can <a href="{% url 'strava_auth' %}?next={{ request.path }}">connect your Strava account</a> or set them up manually if supported.</p>
         {% endif %}
@@ -232,18 +301,14 @@ nav {
 
 <script>
 document.addEventListener('DOMContentLoaded', function () {
-    const form = document.getElementById('hrZoneForm');
-    // const saveButton = document.getElementById('saveHrZonesButton'); // Not directly used, event is on form submit
+    const form = document.getElementById('hr-zones-form');
     const statusMessageDiv = document.getElementById('fetchStatusMessage');
-    const configIdInput = document.getElementById('config_id');
-    const activityTypeInput = document.getElementById('activity_type');
-    const tableBody = document.getElementById('hrZonesTableBody');
 
-    if (!form || !tableBody) {
+    if (!form) {
         return;
     }
 
-    const zoneRows = tableBody.querySelectorAll('tr');
+    const zoneRows = document.querySelectorAll('.zone-row');
 
     function getCookie(name) {
         let cookieValue = null;
@@ -267,11 +332,11 @@ document.addEventListener('DOMContentLoaded', function () {
             maxHrInput.addEventListener('input', function () {
                 const currentZoneOrder = parseInt(row.dataset.zoneOrder);
                 const nextZoneOrder = currentZoneOrder + 1;
-                const nextZoneRow = tableBody.querySelector(`tr[data-zone-order="${nextZoneOrder}"]`);
+                const nextZoneRow = document.querySelector(`tr[data-zone-order="${nextZoneOrder}"][data-config-id="${row.dataset.configId}"]`);
 
                 if (nextZoneRow) {
                     const nextMinHrDisplay = nextZoneRow.querySelector('.min-hr-display');
-                    const nextMinHrInput = nextZoneRow.querySelector('input[name^="zone_min_hr_"]');
+                    const nextMinHrInput = nextZoneRow.querySelector('input[name^="configs"]');
                     let newMinHr = parseInt(this.value);
                     if (isNaN(newMinHr) || newMinHr < 0) newMinHr = 0; // Default to 0 if invalid
 
@@ -282,114 +347,107 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     });
 
-    form.addEventListener('submit', function (event) {
-        event.preventDefault();
-        statusMessageDiv.textContent = 'Saving...';
-        statusMessageDiv.className = 'info-message';
+    function updateMinHrDisplay() {
+        const configColumns = document.querySelectorAll('.config-column');
+        configColumns.forEach(column => {
+            const currentConfigId = column.querySelector('input[name^="configs"][name$="[id]"]').value;
+            const hrInputs = column.querySelectorAll('.zone-max-hr-input');
+            let previousMaxHr = 0;
+            hrInputs.forEach((maxHrInput, index) => {
+                const zoneOrder = parseInt(maxHrInput.dataset.zoneOrder);
+                const minHrDisplay = column.querySelector(`#min-hr-display-${currentConfigId}-${zoneOrder}`);
+                const minHrHiddenInput = column.querySelector(`input[name="configs[${getIndexFromConfigId(currentConfigId)}][zones][${zoneOrder-1}][min_hr]"]`);
 
-        const configId = configIdInput ? configIdInput.value : null;
-        const activityType = activityTypeInput ? activityTypeInput.value : 'DEFAULT';
-
-        if (!configId) {
-            statusMessageDiv.textContent = 'Error: Configuration ID is missing.';
-            statusMessageDiv.className = 'error-message';
-            return;
-        }
-
-        const zonesDefinition = [];
-        let overallIsValid = true;
-        let previousMaxHr = 0; // Min HR for Zone 1 is 0.
-
-        for (const row of zoneRows) {
-            const order = parseInt(row.dataset.zoneOrder);
-            const nameInput = row.querySelector('.zone-name-input');
-            const maxHrInput = row.querySelector('.zone-max-hr-input');
-
-            const name = nameInput.value.trim();
-            const max_hr_string = maxHrInput.value.trim();
-            const max_hr = parseInt(max_hr_string);
-
-            let min_hr = (order === 1) ? 0 : previousMaxHr;
-
-            if (!name) {
-                statusMessageDiv.textContent = `Error: Zone ${order} name cannot be empty.`;
-                overallIsValid = false;
-                break;
-            }
-            if (max_hr_string === '' || isNaN(max_hr) || max_hr <= 0) {
-                 statusMessageDiv.textContent = `Error: Zone ${order} Max HR must be a positive number.`;
-                 overallIsValid = false;
-                 break;
-            }
-            if (max_hr <= min_hr) {
-                statusMessageDiv.textContent = `Error: Zone ${order} Max HR (${max_hr}) must be greater than its Min HR (${min_hr}).`;
-                overallIsValid = false;
-                break;
-            }
-
-            zonesDefinition.push({
-                name: name,
-                min_hr: min_hr,
-                max_hr: max_hr,
-                order: order
-            });
-            previousMaxHr = max_hr;
-        }
-
-        if (!overallIsValid) {
-            statusMessageDiv.className = 'error-message';
-            return;
-        }
-
-        const payload = {
-            activity_type: activityType,
-            zones_definition: zonesDefinition
-        };
-
-        fetch(`/api/settings/custom-zones/${configId}/`, {
-            method: 'PUT',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRFToken': csrftoken
-            },
-            body: JSON.stringify(payload)
-        })
-        .then(response => {
-            if (!response.ok) {
-                 return response.json().then(errData => {
-                    let errorMsg = 'Error saving zones.';
-                    if (errData) {
-                        const messages = [];
-                        for (const key in errData) {
-                            if (Array.isArray(errData[key])) {
-                                errData[key].forEach(msg => {
-                                    if (typeof msg === 'string') messages.push(`${key}: ${msg}`);
-                                    else if (typeof msg === 'object' && msg.detail) messages.push(`${key}: ${msg.detail}`);
-                                    else if (typeof msg === 'object') messages.push(`${key}: ${JSON.stringify(msg)}`);
-                                });
-                            } else {
-                                messages.push(`${key}: ${errData[key]}`);
-                            }
-                        }
-                        if (messages.length > 0) errorMsg = messages.join('; ');
+                if (minHrDisplay) {
+                    if (zoneOrder === 1) {
+                        minHrDisplay.textContent = '0';
+                        if(minHrHiddenInput) minHrHiddenInput.value = '0';
+                        previousMaxHr = parseInt(maxHrInput.value) || 0;
+                    } else {
+                        minHrDisplay.textContent = previousMaxHr;
+                        if(minHrHiddenInput) minHrHiddenInput.value = previousMaxHr;
+                        previousMaxHr = parseInt(maxHrInput.value) || previousMaxHr; // Use previous if current is invalid
                     }
-                    throw new Error(errorMsg);
-                });
-            }
-            return response.json();
-        })
-        .then(data => {
-            statusMessageDiv.textContent = 'Heart rate zones saved successfully!';
-            statusMessageDiv.className = 'success-message';
-            // Consider refreshing zone values from `data` if backend modifies/cleans them
-            // For simplicity, a page refresh after successful save would also show new state.
-            // location.reload(); // Uncomment to reload page on success
-        })
-        .catch(error => {
-            statusMessageDiv.textContent = error.message || 'Error saving zones. Please try again.';
-            statusMessageDiv.className = 'error-message';
+                }
+            });
         });
+    }
+
+    // Helper function to get config index from configId (assuming config_id is unique and maps to forloop.counter0)
+    // This is a bit of a hack; ideally, the index is directly available or consistently retrievable.
+    // For now, this relies on the hidden input name structure.
+    function getIndexFromConfigId(configId) {
+        const allConfigIdInputs = document.querySelectorAll('input[name^="configs"][name$="[id]"]');
+        for (let i = 0; i < allConfigIdInputs.length; i++) {
+            if (allConfigIdInputs[i].value === configId) {
+                const name = allConfigIdInputs[i].name;
+                return parseInt(name.substring(name.indexOf('[') + 1, name.indexOf(']')));
+            }
+        }
+        return -1; // Should not happen
+    }
+
+    zoneRows.forEach(row => {
+        const maxHrInput = row.querySelector('.zone-max-hr-input');
+        if (maxHrInput && !maxHrInput.readOnly) { // Apply only to editable max HR inputs
+            maxHrInput.addEventListener('input', function () {
+                const currentConfigId = this.dataset.configId;
+                const currentZoneOrder = parseInt(this.dataset.zoneOrder);
+
+                // Update subsequent min HR in the same config column
+                let currentVal = parseInt(this.value);
+                if (isNaN(currentVal) || currentVal < 0) currentVal = 0; // Default to 0 if invalid
+
+                const allRowsInThisConfig = document.querySelectorAll(`.zone-row[data-config-id="${currentConfigId}"]`);
+                allRowsInThisConfig.forEach(r => {
+                    const order = parseInt(r.dataset.zoneOrder);
+                    if (order === currentZoneOrder + 1) {
+                        const nextMinHrDisplay = r.querySelector('.min-hr-display');
+                        const nextMinHrHiddenInput = r.querySelector('input[name$="[min_hr]"]');
+                        if (nextMinHrDisplay) nextMinHrDisplay.textContent = currentVal;
+                        if (nextMinHrHiddenInput) nextMinHrHiddenInput.value = currentVal;
+                    }
+                    if (order > currentZoneOrder) { // Update previousMaxHr for subsequent calculations in this chain
+                        const subsequentMaxInput = r.querySelector('.zone-max-hr-input');
+                        if (subsequentMaxInput && !subsequentMaxInput.readOnly) {
+                           currentVal = parseInt(subsequentMaxInput.value) || currentVal;
+                        }
+                    }
+                });
+                updateMinHrDisplay(); // Re-run to ensure all derived values are correct
+            });
+        }
     });
+
+    function saveAllChanges() {
+        // Optional: Client-side validation can be performed here before submitting.
+        // For example, check if all required fields are filled, HR values are logical etc.
+
+        // Ensure the hidden 'action' input is set for 'save_all_zone_configs'
+        const actionInput = document.getElementById('form-action-input');
+        if (actionInput) {
+            actionInput.value = 'save_all_zone_configs';
+        } else {
+            console.error("'form-action-input' not found. Cannot set action for form submission.");
+            alert("A critical form element is missing. Cannot save.");
+            return;
+        }
+
+        // Submit the main form
+        const form = document.getElementById('hr-zones-form');
+        if (form) {
+            form.submit();
+        } else {
+            console.error("'hr-zones-form' not found. Cannot submit form.");
+            alert("The main form is missing. Cannot save.");
+        }
+    }
+
+    document.getElementById('save-all-changes-button').addEventListener('click', saveAllChanges);
+
+    // Initial calculation of Min HR display values on page load
+    updateMinHrDisplay();
+
 });
 </script>
 
@@ -403,7 +461,7 @@ document.addEventListener('DOMContentLoaded', function() {
     if (fetchButton) {
         fetchButton.addEventListener('click', function() {
             // Check if a custom config exists (passed from Django template)
-            const customConfigId = "{{ custom_zones_config.id|default:'' }}"; // Get config ID, default to empty string if not set
+            const customConfigId = "{{ user_zone_configurations.0.config.id|default:'' }}"; // Get config ID, default to empty string if not set
 
             if (customConfigId) { // If there's a config ID, it means a config exists that might be overwritten
                 const userConfirmed = confirm("Fetching new zones from Strava will override your current custom settings and any unsaved changes will also be lost. Are you sure you want to proceed?");
@@ -424,7 +482,6 @@ document.addEventListener('DOMContentLoaded', function() {
                     'Content-Type': 'application/json',
                     'X-CSRFToken': csrfToken
                 },
-                // body: JSON.stringify({}), // Add body if your endpoint expects it
             })
             .then(response => {
                 if (response.ok) {
@@ -503,7 +560,30 @@ document.addEventListener('DOMContentLoaded', function() {
         item.addEventListener('mouseenter', () => item.style.backgroundColor = '#f5f5f5');
         item.addEventListener('mouseleave', () => item.style.backgroundColor = '#fff');
         item.addEventListener('click', function() {
-          // TODO: handle selection
+          const selectedActivityType = item.dataset.value;
+          const mainHrZonesForm = document.getElementById('hr-zones-form');
+          const formActionInput = document.getElementById('form-action-input');
+
+          if (mainHrZonesForm && formActionInput && selectedActivityType) {
+            formActionInput.value = 'add_new_activity_config';
+
+            // Remove any existing hidden input for 'new_activity_type' to prevent duplicates
+            let existingHiddenInput = mainHrZonesForm.querySelector('input[name="new_activity_type"]');
+            if (existingHiddenInput) {
+              existingHiddenInput.remove();
+            }
+
+            // Create and append a new hidden input for the selected activity type
+            const hiddenActivityTypeInput = document.createElement('input');
+            hiddenActivityTypeInput.type = 'hidden';
+            hiddenActivityTypeInput.name = 'new_activity_type'; // This is what the backend expects
+            hiddenActivityTypeInput.value = selectedActivityType;
+            mainHrZonesForm.appendChild(hiddenActivityTypeInput);
+
+            mainHrZonesForm.submit();
+          } else {
+            console.error('Form or action input not found, or no activity type selected.');
+          }
           closeDropdown();
         });
         dropdown.appendChild(item);

@@ -9,16 +9,20 @@ from urllib.parse import urlencode
 
 import requests
 from django.conf import settings
+from django.contrib import messages
 from django.contrib.auth import get_user_model, login
+from django.contrib.auth.mixins import LoginRequiredMixin
+from django.db import transaction
+from django.db.models import QuerySet
 from django.http import (
 	HttpRequest,
 	HttpResponse,
 	HttpResponseBadRequest,
 	HttpResponseRedirect,
 )
-from django.shortcuts import render
+from django.shortcuts import redirect, render
 from django.utils import timezone
-from django.views.generic import TemplateView
+from django.views.generic import TemplateView, View
 from rest_framework import generics, status
 from rest_framework.authtoken.models import Token
 from rest_framework.decorators import api_view, permission_classes
@@ -410,12 +414,10 @@ class FetchStravaHRZonesView(APIView):
 			)
 
 
-class UserHRZonesDisplayView(TemplateView):
-	"""Displays the user's configured heart rate zones."""
+class UserHRZonesDisplayView(LoginRequiredMixin, TemplateView):
+	"""Displays the user's configured heart rate zones and handles updates."""
 
 	template_name = "api/hr_zone_display.html"
-
-	permission_classes = [IsAuthenticated]
 
 	def get_context_data(self, **kwargs: Any) -> dict:
 		context = super().get_context_data(**kwargs)
@@ -475,4 +477,340 @@ class UserHRZonesDisplayView(TemplateView):
 		context["user_zone_configurations"] = user_configs_data
 		context["error_message"] = error_message
 		context["existing_activity_types_json"] = json.dumps(list(existing_activities))
+		# Pass ActivityType enum to context for the "Add Activity Config" modal/form
+		context["activity_types_enum"] = [
+			{"value": choice.value, "label": choice.label}
+			for choice in ActivityType  # type: ignore[attr-defined]
+			if choice != ActivityType.DEFAULT
+		]
 		return context
+
+	def post(self, request: HttpRequest, *args: Any, **kwargs: Any) -> HttpResponse:  # noqa: ARG002
+		action = request.POST.get("action")
+		user = request.user
+
+		if not user.is_authenticated:
+			messages.error(request, "User not authenticated.")
+			return redirect(request.path_info)
+
+		try:
+			strava_user = user.strava_profile
+		except StravaUser.DoesNotExist:
+			messages.error(request, "Strava profile not found.")
+			return redirect(request.path_info)
+
+		if action == "save_all_zone_configs":
+			return self._handle_save_all_zone_configs(request, strava_user)
+		if action and action.startswith("add_default_zones_to_"):
+			config_id_to_add_defaults = action.split("add_default_zones_to_")[-1]
+			return self._handle_add_default_zones(request, strava_user, config_id_to_add_defaults)
+		if action == "add_new_activity_config":
+			return self._handle_add_new_activity_config(request, strava_user)
+
+		messages.error(request, "Invalid action specified.")
+		return redirect(request.path_info)
+
+	@transaction.atomic
+	def _handle_save_all_zone_configs(  # noqa: C901, PLR0915
+		self, request: HttpRequest, strava_user: StravaUser
+	) -> HttpResponseRedirect:
+		form_data = request.POST
+		parsed_configs: dict = {}
+
+		# Parse form data into a structured dictionary
+		# Expected keys: configs[idx][id], configs[idx][activity_type],
+		# configs[idx][zones][z_idx][id], ...[name], ...[min_hr], ...[max_hr], ...[order]
+		for key, value in form_data.items():
+			if key.startswith("configs["):
+				parts = key.replace("]", "").split("[")
+				try:
+					config_idx = int(parts[1])
+					parsed_configs.setdefault(config_idx, {"zones": {}})
+
+					if len(parts) == 3:  # Config level attribute (id, activity_type)
+						attr_name = parts[2]
+						if attr_name in ["id", "activity_type"]:
+							parsed_configs[config_idx][attr_name] = value
+					elif len(parts) == 5 and parts[2] == "zones":  # Zone level attribute
+						zone_idx = int(parts[3])
+						zone_attr = parts[4]
+						parsed_configs[config_idx]["zones"].setdefault(zone_idx, {})
+						parsed_configs[config_idx]["zones"][zone_idx][zone_attr] = (
+							value.strip() if isinstance(value, str) else value
+						)
+				except (IndexError, ValueError) as e:
+					logger.warning(
+						f"Could not parse form key: {key} with value: {value}. Error: {e}"
+					)
+					continue  # Skip malformed keys
+
+		if not parsed_configs:
+			messages.error(request, "No configuration data received or data was malformed.")
+			return redirect(request.path_info)
+
+		default_config_zone_names_by_order = {}
+
+		# First pass: Validate configs and get default config's zone names
+		for config_idx in sorted(parsed_configs.keys()):
+			data = parsed_configs[config_idx]
+			config_id = data.get("id")
+			activity_type_val = data.get("activity_type")
+
+			if not config_id or not activity_type_val:
+				messages.error(
+					request,
+					f"Missing ID or Activity Type for a configuration. Index: {config_idx}",
+				)
+				return redirect(request.path_info)  # Abort transaction
+
+			try:
+				# Validate config ownership early
+				CustomZonesConfig.objects.get(
+					id=config_id, user=strava_user, activity_type=activity_type_val
+				)
+			except CustomZonesConfig.DoesNotExist:
+				messages.error(
+					request,
+					"Invalid or unauthorized configuration: "
+					f"ID {config_id}, Type {activity_type_val}.",
+				)
+				return redirect(request.path_info)  # Abort transaction
+
+			if activity_type_val == ActivityType.DEFAULT:
+				for zone_idx in sorted(data["zones"].keys()):
+					zone_data = data["zones"][zone_idx]
+					try:
+						order = int(zone_data.get("order"))
+						name = zone_data.get("name", f"Zone {order}").strip()
+						if not name:
+							name = f"Zone {order}"
+						default_config_zone_names_by_order[order] = name
+					except (ValueError, TypeError):
+						messages.error(
+							request,
+							f"Invalid zone order or name for Default config. Zone {zone_idx}",
+						)
+						return redirect(request.path_info)  # Abort transaction
+
+		# Second pass: Update/create zones for all configs
+		for config_idx in sorted(parsed_configs.keys()):
+			data = parsed_configs[config_idx]
+			config_instance = CustomZonesConfig.objects.get(
+				id=data["id"], user=strava_user
+			)  # Already validated
+
+			form_zone_ids_for_this_config = set()
+			zones_data_for_config = sorted(
+				data["zones"].items(), key=lambda x: int(x[1].get("order", 0))
+			)
+
+			for _zone_idx_key, zone_data in zones_data_for_config:
+				zone_id_str = zone_data.get("id")
+				if zone_id_str and zone_id_str.strip():
+					try:
+						form_zone_ids_for_this_config.add(int(zone_id_str))
+					except ValueError:
+						logger.warning(
+							f"Invalid zone ID '{zone_id_str}' for config {config_instance.id}"
+						)
+
+			# Delete zones associated with this config that are not in the current submission
+			HeartRateZone.objects.filter(config=config_instance).exclude(
+				id__in=form_zone_ids_for_this_config
+			).delete()
+
+			for _zone_idx_key, zone_data in zones_data_for_config:
+				zone_id = zone_data.get("id")
+				try:
+					order = int(zone_data.get("order"))
+					min_hr_str = zone_data.get("min_hr", "0")
+					max_hr_str = zone_data.get("max_hr")
+
+					min_hr = int(min_hr_str) if min_hr_str and min_hr_str.strip() else 0
+
+					if (
+						max_hr_str is None
+						or max_hr_str.strip().lower() == "open"
+						or max_hr_str.strip() == ""
+					):
+						max_hr = 220
+					else:
+						max_hr = int(max_hr_str)
+
+					min_hr = max(min_hr, 0)
+					if max_hr <= min_hr and max_hr != 220:
+						messages.warning(
+							request,
+							f"Max HR ({max_hr}) must be greater than Min HR ({min_hr}) for zone "
+							f"{order} in {config_instance.get_activity_type_display()}. "
+							"Skipping update for this zone.",
+						)
+						continue
+				except (ValueError, TypeError) as e:
+					messages.error(
+						request,
+						f"Invalid HR value for zone {zone_data.get('name', 'with order ' + str(order))} in "  # noqa: E501
+						f"{config_instance.get_activity_type_display()}: {e}",
+					)
+					continue
+
+				zone_name_from_form = zone_data.get("name", f"Zone {order}").strip()
+				if not zone_name_from_form:
+					zone_name_from_form = f"Zone {order}"
+
+				final_zone_name = zone_name_from_form
+				if config_instance.activity_type != ActivityType.DEFAULT:
+					final_zone_name = default_config_zone_names_by_order.get(
+						order, zone_name_from_form
+					)
+
+				zone_defaults = {
+					"name": final_zone_name,
+					"min_hr": min_hr,
+					"max_hr": max_hr,
+					"order": order,
+				}
+
+				if zone_id and zone_id.strip():
+					try:
+						# Ensure the zone_id is an integer if it's not empty
+						HeartRateZone.objects.update_or_create(
+							id=int(zone_id),
+							config=config_instance,  # Ensure it belongs to the current config
+							defaults=zone_defaults,
+						)
+					except ValueError:
+						# zone_id was not a valid int, treat as new if other fields are valid
+						logger.warning(
+							f"Invalid zone ID '{zone_id}' for update. "
+							"Attempting to create as new zone if data is valid."
+						)
+						HeartRateZone.objects.create(config=config_instance, **zone_defaults)
+					except (
+						HeartRateZone.DoesNotExist
+					):  # Should be caught by update_or_create, but good practice
+						HeartRateZone.objects.create(config=config_instance, **zone_defaults)
+				else:
+					HeartRateZone.objects.create(config=config_instance, **zone_defaults)
+
+		messages.success(request, "Heart rate zones saved successfully!")
+		return redirect(request.path_info)
+
+	@transaction.atomic
+	def _handle_add_default_zones(self, request, strava_user, config_id):
+		try:
+			config_to_update = CustomZonesConfig.objects.get(id=config_id, user=strava_user)
+			if config_to_update.zones_definition.exists():
+				messages.warning(request, "This configuration already has zones defined.")
+			else:
+				try:
+					default_config = CustomZonesConfig.objects.get(
+						user=strava_user, activity_type=ActivityType.DEFAULT
+					)
+					default_zones = default_config.zones_definition.all().order_by("order")
+					if not default_zones.exists():
+						messages.error(
+							request, "Default zone configuration is empty or not found."
+						)
+						return redirect(request.path_info)
+
+					for zone in default_zones:
+						HeartRateZone.objects.create(
+							config=config_to_update,
+							name=zone.name,
+							min_hr=zone.min_hr,
+							max_hr=zone.max_hr,
+							order=zone.order,
+						)
+				except CustomZonesConfig.DoesNotExist:
+					messages.error(request, "Default zone configuration not found.")
+					return redirect(request.path_info)
+				messages.success(
+					request,
+					f"Default zones added to {config_to_update.get_activity_type_display()}.",
+				)
+		except CustomZonesConfig.DoesNotExist:
+			messages.error(request, "Configuration not found.")
+		except Exception as e:
+			logger.error(f"Error adding default zones for config {config_id}: {e!r}")
+			messages.error(request, "An error occurred while adding default zones.")
+		return redirect(request.path_info)
+
+	@transaction.atomic
+	def _handle_add_new_activity_config(
+		self, request: HttpRequest, strava_user: StravaUser
+	) -> HttpResponse:
+		activity_type_value = request.POST.get("new_activity_type")
+		if not activity_type_value:
+			messages.error(request, "No activity type selected.")
+			return redirect(request.path_info)
+
+		is_valid_activity = any(
+			choice.value == activity_type_value
+			for choice in ActivityType  # type: ignore[attr-defined]
+		)
+		if not is_valid_activity or activity_type_value == ActivityType.DEFAULT.value:  # type: ignore[attr-defined]
+			messages.error(
+				request, "Invalid activity type selected or DEFAULT cannot be added again."
+			)
+			return redirect(request.path_info)
+
+		if CustomZonesConfig.objects.filter(
+			user=strava_user, activity_type=activity_type_value
+		).exists():
+			messages.warning(
+				request,
+				f"A configuration for {ActivityType(activity_type_value).label} already exists.",
+			)
+			return redirect(request.path_info)
+
+		try:
+			new_config = CustomZonesConfig.objects.create(
+				user=strava_user, activity_type=activity_type_value
+			)
+			default_config = (
+				CustomZonesConfig.objects.filter(
+					user=strava_user, activity_type=ActivityType.DEFAULT
+				)
+				.prefetch_related("zones_definition")
+				.first()
+			)
+
+			if default_config:
+				default_zones = default_config.zones_definition.all().order_by("order")
+				for dz in default_zones:
+					HeartRateZone.objects.create(
+						config=new_config,
+						name=dz.name,
+						min_hr=dz.min_hr,
+						max_hr=dz.max_hr,
+						order=dz.order,
+					)
+			messages.success(
+				request, f"Configuration for {ActivityType(activity_type_value).label} added."
+			)
+		except Exception as e:
+			logger.error(f"Error creating new activity config for {activity_type_value}: {e!r}")
+			messages.error(request, "Failed to add new configuration.")
+
+		return redirect(request.path_info)
+
+
+# Strava OAuth Views remain unchanged below
+class StravaAuthorizeView(LoginRequiredMixin, View):
+	"""Redirects the user to Strava's authorization page."""
+
+	def get(self, request: HttpRequest) -> HttpResponseRedirect:
+		scopes = "read,activity:read_all,profile:read_all"
+		client_id = settings.STRAVA_CLIENT_ID
+		redirect_uri = f"{request.scheme}://localhost:8000/api/auth/strava/callback"
+
+		params = {
+			"client_id": client_id,
+			"redirect_uri": redirect_uri,
+			"response_type": "code",
+			"approval_prompt": "auto",
+			"scope": scopes,
+		}
+
+		return HttpResponseRedirect(f"{STRAVA_AUTH_URL}?{urlencode(params)}")

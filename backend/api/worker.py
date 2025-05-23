@@ -213,7 +213,7 @@ class StravaHRWorker:
 
 				# Strava's last zone has max as -1, interpret as no upper limit
 				# PositiveIntegerField in model typically cannot be None and needs a value.
-				max_hr_db = 999 if max_hr_strava == -1 or max_hr_strava is None else max_hr_strava
+				max_hr_db = 220 if max_hr_strava == -1 or max_hr_strava is None else max_hr_strava
 
 				# Assuming min_hr is always present and valid from Strava.
 				# If min_hr could be missing, handle similarly.
