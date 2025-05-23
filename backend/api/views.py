@@ -20,7 +20,7 @@ from django.http import (
 	HttpResponseBadRequest,
 	HttpResponseRedirect,
 )
-from django.shortcuts import redirect, render
+from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.views.generic import TemplateView, View
 from rest_framework import generics, status
@@ -501,6 +501,8 @@ class UserHRZonesDisplayView(LoginRequiredMixin, TemplateView):
 
 		if action == "save_all_zone_configs":
 			return self._handle_save_all_zone_configs(request, strava_user)
+		if action == "delete_activity_config":
+			return self._handle_delete_activity_config(request, strava_user)
 		if action and action.startswith("add_default_zones_to_"):
 			config_id_to_add_defaults = action.split("add_default_zones_to_")[-1]
 			return self._handle_add_default_zones(request, strava_user, config_id_to_add_defaults)
@@ -792,6 +794,50 @@ class UserHRZonesDisplayView(LoginRequiredMixin, TemplateView):
 		except Exception as e:
 			logger.error(f"Error creating new activity config for {activity_type_value}: {e!r}")
 			messages.error(request, "Failed to add new configuration.")
+
+		return redirect(request.path_info)
+
+	@transaction.atomic
+	def _handle_delete_activity_config(
+		self, request: HttpRequest, strava_user: StravaUser
+	) -> HttpResponseRedirect:
+		config_id_to_delete = request.POST.get("config_id_to_delete")
+
+		if not config_id_to_delete:
+			messages.error(request, "Configuration ID not provided for deletion.")
+			return redirect(request.path_info)
+
+		try:
+			# Ensure the config belongs to the user and exists
+			config_to_delete = get_object_or_404(
+				CustomZonesConfig, id=config_id_to_delete, user=strava_user
+			)
+
+			# Prevent deletion of the DEFAULT configuration
+			if config_to_delete.activity_type == ActivityType.DEFAULT:
+				messages.error(request, "The 'Default' configuration cannot be deleted.")
+				return redirect(request.path_info)
+
+			activity_type_display = (
+				config_to_delete.get_activity_type_display()
+			)  # Get display name before deleting
+			config_to_delete.delete()
+			messages.success(
+				request, f"Successfully deleted the '{activity_type_display}' configuration."
+			)
+
+		except CustomZonesConfig.DoesNotExist:  # Should be caught by get_object_or_404
+			messages.error(
+				request, "Configuration not found or you do not have permission to delete it."
+			)
+		except Exception as e:
+			logger.exception(
+				f"Error deleting configuration {config_id_to_delete} for user {strava_user.id}: "
+				f"{e!s}"
+			)
+			messages.error(
+				request, "An unexpected error occurred while trying to delete the configuration."
+			)
 
 		return redirect(request.path_info)
 

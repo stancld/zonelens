@@ -1152,6 +1152,17 @@ class ZoneSummaryViewTests(APITestCase):
 		# Week 9 of 2025 is Feb 24 - Mar 2. Activities on Mar 1 & 2 fall in this week and month.
 		# Activity 1: March 1, 2025 (Saturday, Week 9)
 		activity1_date = datetime(2025, 3, 1, 10, 0, 0, tzinfo=pytz.UTC)
+		# Sunday, February 4, 2024 (ISO Week 5)
+		activity2_date = datetime(2025, 3, 2, 11, 0, 0, tzinfo=pytz.UTC)
+
+		iso_year, iso_week_jan, _ = activity1_date.isocalendar()
+		iso_year_feb, iso_week_feb, _ = activity2_date.isocalendar()
+
+		self.assertEqual(iso_year, 2025)
+		self.assertEqual(iso_week_jan, 9)
+		self.assertEqual(iso_year_feb, 2025)
+		self.assertEqual(iso_week_feb, 9)  # Both should be in week 9
+
 		ActivityZoneTimes.objects.create(
 			user=self.strava_user,
 			activity_id=101,
@@ -1175,7 +1186,6 @@ class ZoneSummaryViewTests(APITestCase):
 		)
 
 		# Activity 2: March 2, 2025 (Sunday, Week 9)
-		activity2_date = datetime(2025, 3, 2, 11, 0, 0, tzinfo=pytz.UTC)
 		ActivityZoneTimes.objects.create(
 			user=self.strava_user,
 			activity_id=102,
@@ -1593,8 +1603,8 @@ class UserHRZonesDisplayViewTests(TestCase):
 			self.user, form_data, self.view
 		)  # Modified
 		self.default_config.refresh_from_db()
-		self.assertEqual(self.default_config.zones_definition.get(order=2).max_hr, 999)
-		self.assertEqual(self.default_config.zones_definition.get(order=3).max_hr, 999)
+		self.assertEqual(self.default_config.zones_definition.get(order=2).max_hr, 220)
+		self.assertEqual(self.default_config.zones_definition.get(order=3).max_hr, 220)
 
 	def test_add_default_zones_to_empty_config(self) -> None:
 		self.assertTrue(self.cycling_config.zones_definition.count() == 0)
@@ -1690,3 +1700,70 @@ class UserHRZonesDisplayViewTests(TestCase):
 		self.assertEqual(response.status_code, 302)
 		messages = list(get_messages(request_obj))
 		self.assertTrue(any("DEFAULT cannot be added again" in str(m) for m in messages))
+
+	def test_delete_activity_config(self) -> None:
+		"""Test deleting an activity-specific HR zone configuration."""
+		self.client.login(username="testuserdisplayview", password="password")
+
+		# Ensure the running config exists before deletion
+		self.assertTrue(CustomZonesConfig.objects.filter(id=self.running_config.id).exists())
+		running_config_id = self.running_config.id
+		initial_config_count = CustomZonesConfig.objects.filter(user=self.strava_user).count()
+
+		response = self.client.post(
+			self.url,
+			{
+				"action": "delete_activity_config",
+				"config_id_to_delete": str(running_config_id),
+			},
+		)
+
+		self.assertEqual(response.status_code, 302)  # Should redirect
+
+		# Check that the running config is deleted
+		self.assertFalse(CustomZonesConfig.objects.filter(id=running_config_id).exists())
+
+		# Check that other configs (e.g., default) still exist
+		self.assertTrue(CustomZonesConfig.objects.filter(id=self.default_config.id).exists())
+		self.assertTrue(CustomZonesConfig.objects.filter(id=self.cycling_config.id).exists())
+
+		# Check that the total count of configs for the user has decreased by one
+		self.assertEqual(
+			CustomZonesConfig.objects.filter(user=self.strava_user).count(),
+			initial_config_count - 1,
+		)
+
+		# Check for success message
+		messages = list(get_messages(response.wsgi_request))
+		self.assertEqual(len(messages), 1)
+		# The display name for ActivityType.RUN is 'Run'
+		self.assertEqual(str(messages[0]), "Successfully deleted the 'Run' configuration.")
+
+	def test_delete_default_activity_config_attempt(self) -> None:
+		"""Test attempting to delete the DEFAULT HR zone configuration."""
+		self.client.login(username="testuserdisplayview", password="password")
+
+		default_config_id = self.default_config.id
+		initial_config_count = CustomZonesConfig.objects.filter(user=self.strava_user).count()
+
+		response = self.client.post(
+			self.url,
+			{
+				"action": "delete_activity_config",
+				"config_id_to_delete": str(default_config_id),
+			},
+		)
+
+		self.assertEqual(response.status_code, 302)  # Should redirect
+
+		# Check that the default config is NOT deleted
+		self.assertTrue(CustomZonesConfig.objects.filter(id=default_config_id).exists())
+		self.assertEqual(
+			CustomZonesConfig.objects.filter(user=self.strava_user).count(),
+			initial_config_count,  # Count should remain the same
+		)
+
+		# Check for error message
+		messages = list(get_messages(response.wsgi_request))
+		self.assertEqual(len(messages), 1)
+		self.assertEqual(str(messages[0]), "The 'Default' configuration cannot be deleted.")

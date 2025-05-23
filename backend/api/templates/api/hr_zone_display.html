@@ -217,6 +217,16 @@ nav {
                             <h3 style="margin:0; color: #333;">{{ config_data.config.get_activity_type_display|default:config_data.config.activity_type }}</h3>
                             {% if config_data.config.activity_type == "DEFAULT" %}
                                 <button type="button" id="addActivityConfigButton" title="Add activity-specific configuration" style="display:inline-flex; align-items:center; justify-content:center; width:22px; height:22px; background-color:#FC4C02; color:white; border:none; border-radius:50%; font-size:14px; font-weight:600; line-height:1; cursor:pointer;">+</button>
+                            {% else %}
+                                <button type="button" class="delete-config-btn" title="Delete this configuration"
+                                        data-config-id="{{ config_data.config.id }}"
+                                        data-activity-type="{{ config_data.config.get_activity_type_display|default:config_data.config.activity_type }}"
+                                        style="display:inline-flex; align-items:center; justify-content:center;
+                                               width:22px; height:22px; background-color:#D8000C; /* Red */
+                                               color:white; border:none; border-radius:50%;
+                                               font-size:14px; font-weight:bold; line-height:1; cursor:pointer;">
+                                    &times;
+                                </button>
                             {% endif %}
                         </div>
 
@@ -274,6 +284,23 @@ nav {
                         {% endif %}
                     </div>
                     {% endfor %}
+                </div>
+
+                <div id="deleteConfirmModal" style="display:none; position:fixed; left:0; top:0; width:100%; height:100%; background-color:rgba(0,0,0,0.5); z-index:1001; align-items:center; justify-content:center;">
+                    <div style="background-color:white; padding:20px; border-radius:8px; box-shadow:0 4px 6px rgba(0,0,0,0.1); text-align:center; min-width:300px;">
+                        <p>Are you sure you want to remove the <strong id="modalActivityTypeName"></strong> configuration?</p>
+                        <input type="hidden" id="modalConfigIdToDelete" value="">
+                        <button type="button" id="confirmDeleteBtn" style="background-color:#D8000C; color:white; padding:10px 20px; border:none; border-radius:5px; margin-right:10px; cursor:pointer;">Confirm Delete</button>
+                        <button type="button" id="cancelDeleteBtn" style="background-color:#ccc; color:black; padding:10px 20px; border:none; border-radius:5px; cursor:pointer;">Cancel</button>
+                    </div>
+                </div>
+
+                <div id="fetchConfirmModal" style="display:none; position:fixed; left:0; top:0; width:100%; height:100%; background-color:rgba(0,0,0,0.5); z-index:1001; align-items:center; justify-content:center;">
+                    <div style="background-color:white; padding:20px; border-radius:8px; box-shadow:0 4px 6px rgba(0,0,0,0.1); text-align:center; min-width:320px; max-width: 450px;">
+                        <p style="margin-top:0; margin-bottom:15px; font-size:16px; line-height:1.5;">Fetching new zones from Strava will override your current custom settings and any unsaved changes will also be lost. <br><br>Are you sure you want to proceed?</p>
+                        <button type="button" id="proceedFetchBtn" style="background-color:#FC4C02; color:white; padding:10px 20px; border:none; border-radius:5px; margin-right:10px; cursor:pointer; font-weight:bold;">Proceed</button>
+                        <button type="button" id="cancelFetchBtn" style="background-color:#ccc; color:black; padding:10px 20px; border:none; border-radius:5px; cursor:pointer;">Cancel</button>
+                    </div>
                 </div>
 
                 {% if user_zone_configurations %}
@@ -448,6 +475,84 @@ document.addEventListener('DOMContentLoaded', function () {
     // Initial calculation of Min HR display values on page load
     updateMinHrDisplay();
 
+    // --- Delete Confirmation Modal Logic ---
+    const deleteConfirmModal = document.getElementById('deleteConfirmModal');
+    const modalActivityTypeName = document.getElementById('modalActivityTypeName');
+    const modalConfigIdToDelete = document.getElementById('modalConfigIdToDelete'); // Hidden input in modal
+    const confirmDeleteBtn = document.getElementById('confirmDeleteBtn');
+    const cancelDeleteBtn = document.getElementById('cancelDeleteBtn');
+    const deleteButtons = document.querySelectorAll('.delete-config-btn');
+
+    if (deleteConfirmModal && modalActivityTypeName && modalConfigIdToDelete && confirmDeleteBtn && cancelDeleteBtn) {
+        deleteButtons.forEach(button => {
+            button.addEventListener('click', function(event) {
+                event.preventDefault(); // Prevent any default button action if it's in a form
+                const configId = this.dataset.configId;
+                const activityType = this.dataset.activityType;
+
+                modalActivityTypeName.textContent = activityType;
+                modalConfigIdToDelete.value = configId; // Store for actual deletion later
+
+                deleteConfirmModal.style.display = 'flex'; // Show modal (it's a flex container)
+            });
+        });
+
+        cancelDeleteBtn.addEventListener('click', function() {
+            deleteConfirmModal.style.display = 'none';
+        });
+
+        confirmDeleteBtn.addEventListener('click', function() {
+            const configId = modalConfigIdToDelete.value;
+            if (!configId) {
+                console.error('No config ID found for deletion.');
+                deleteConfirmModal.style.display = 'none';
+                return;
+            }
+
+            // Create a new form dynamically
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.action = ''; // Post to the current page URL
+
+            // CSRF token
+            const csrfInput = document.createElement('input');
+            csrfInput.type = 'hidden';
+            csrfInput.name = 'csrfmiddlewaretoken';
+            csrfInput.value = '{{ csrf_token }}'; // Django template tag for CSRF token
+            form.appendChild(csrfInput);
+
+            // Action input
+            const actionInput = document.createElement('input');
+            actionInput.type = 'hidden';
+            actionInput.name = 'action';
+            actionInput.value = 'delete_activity_config';
+            form.appendChild(actionInput);
+
+            // Config ID to delete input
+            const configIdInput = document.createElement('input');
+            configIdInput.type = 'hidden';
+            configIdInput.name = 'config_id_to_delete';
+            configIdInput.value = configId;
+            form.appendChild(configIdInput);
+
+            // Append to body, submit, and remove
+            document.body.appendChild(form);
+            form.submit();
+            document.body.removeChild(form); // Clean up
+
+            deleteConfirmModal.style.display = 'none'; // Hide modal after initiating submission
+        });
+
+        // Optional: Close modal if clicked on the backdrop (outside the modal content)
+        deleteConfirmModal.addEventListener('click', function(event) {
+            if (event.target === deleteConfirmModal) { // Check if the click is directly on the backdrop
+                deleteConfirmModal.style.display = 'none';
+            }
+        });
+    } else {
+        // console.error('One or more delete modal elements not found. Deletion UI might not work.');
+    }
+    // --- End Delete Confirmation Modal Logic ---
 });
 </script>
 
@@ -460,54 +565,87 @@ document.addEventListener('DOMContentLoaded', function() {
 
     if (fetchButton) {
         fetchButton.addEventListener('click', function() {
-            // Check if a custom config exists (passed from Django template)
-            const customConfigId = "{{ user_zone_configurations.0.config.id|default:'' }}"; // Get config ID, default to empty string if not set
+            const customConfigId = "{{ user_zone_configurations.0.config.id|default:'' }}";
+            const fetchConfirmModal = document.getElementById('fetchConfirmModal');
+            const proceedFetchBtn = document.getElementById('proceedFetchBtn');
+            const cancelFetchBtn = document.getElementById('cancelFetchBtn');
 
-            if (customConfigId) { // If there's a config ID, it means a config exists that might be overwritten
-                const userConfirmed = confirm("Fetching new zones from Strava will override your current custom settings and any unsaved changes will also be lost. Are you sure you want to proceed?");
-                if (!userConfirmed) {
-                    statusMessageDiv.textContent = 'Operation cancelled by user.';
-                    statusMessageDiv.className = 'info-message'; // Use existing styles
-                    return; // Abort if user cancels
-                }
-            }
+            // Define the actual fetch operation as a function to avoid duplication
+            const executeFetch = () => {
+                statusMessageDiv.textContent = 'Fetching HR zones from Strava...';
+                statusMessageDiv.className = 'info-message';
+                fetchButton.disabled = true;
 
-            statusMessageDiv.textContent = 'Fetching HR zones from Strava...';
-            statusMessageDiv.className = 'info-message'; // Use existing styles
-            fetchButton.disabled = true;
+                fetch(API_FETCH_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': csrfToken
+                    },
+                })
+                .then(response => {
+                    if (response.ok) {
+                        return response.json();
+                    } else {
+                        return response.json().then(err => {
+                            throw new Error(err.detail || err.message || 'Failed to fetch HR zones.');
+                        });
+                    }
+                })
+                .then(data => {
+                    statusMessageDiv.textContent = data.message || 'HR zones fetched successfully! Reloading page...';
+                    statusMessageDiv.className = 'success-message';
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 2000);
+                })
+                .catch(error => {
+                    console.error('Error fetching HR zones:', error);
+                    statusMessageDiv.textContent = 'Error: ' + error.message;
+                    statusMessageDiv.className = 'error-message';
+                })
+                .finally(() => {
+                    fetchButton.disabled = false;
+                });
+            };
 
-            fetch(API_FETCH_URL, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRFToken': csrfToken
-                },
-            })
-            .then(response => {
-                if (response.ok) {
-                    return response.json();
+            if (customConfigId) { // If a config exists that might be overwritten
+                if (fetchConfirmModal && proceedFetchBtn && cancelFetchBtn) {
+                    fetchConfirmModal.style.display = 'flex';
+
+                    // Use onclick to ensure handlers are not repeatedly added
+                    proceedFetchBtn.onclick = function() {
+                        fetchConfirmModal.style.display = 'none';
+                        executeFetch();
+                    };
+
+                    cancelFetchBtn.onclick = function() {
+                        fetchConfirmModal.style.display = 'none';
+                        statusMessageDiv.textContent = 'Operation cancelled by user.';
+                        statusMessageDiv.className = 'info-message';
+                    };
+
+                    // Handle backdrop click for cancellation
+                    fetchConfirmModal.onclick = function(event) {
+                        if (event.target === fetchConfirmModal) { // Check if the click is directly on the backdrop
+                            fetchConfirmModal.style.display = 'none';
+                            statusMessageDiv.textContent = 'Operation cancelled by user.';
+                            statusMessageDiv.className = 'info-message';
+                        }
+                    };
                 } else {
-                    return response.json().then(err => {
-                        throw new Error(err.detail || err.message || 'Failed to fetch HR zones.');
-                    });
+                    console.error('Fetch confirmation modal elements not found. Falling back to native confirm.');
+                    if (confirm("Fetching new zones from Strava will override your current custom settings and any unsaved changes will also be lost. Are you sure you want to proceed?")) {
+                        executeFetch();
+                    } else {
+                        statusMessageDiv.textContent = 'Operation cancelled by user.';
+                        statusMessageDiv.className = 'info-message';
+                    }
                 }
-            })
-            .then(data => {
-                statusMessageDiv.textContent = data.message || 'HR zones fetched successfully! Reloading page...';
-                statusMessageDiv.className = 'success-message';
-                // Reload the page to see updated zones
-                setTimeout(() => {
-                    window.location.reload();
-                }, 2000); // Delay for user to read message
-            })
-            .catch(error => {
-                console.error('Error fetching HR zones:', error);
-                statusMessageDiv.textContent = 'Error: ' + error.message;
-                statusMessageDiv.className = 'error-message'; // Use existing styles
-            })
-            .finally(() => {
-                fetchButton.disabled = false;
-            });
+            } else {
+                // No custom config ID, proceed directly
+                executeFetch();
+            }
         });
     }
 });
