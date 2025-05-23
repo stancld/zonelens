@@ -390,9 +390,7 @@ class FetchStravaHRZonesView(APIView):
 
 		try:
 			worker = StravaHRWorker(user_strava_id=user_strava_profile.strava_id)
-			success = worker.fetch_and_store_strava_hr_zones()
-
-			if success:
+			if _success := worker.fetch_and_store_strava_hr_zones():
 				# The worker logs specifics. Here, just confirm the operation.
 				return Response(
 					{"message": "Strava HR zones fetch process completed."},
