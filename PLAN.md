@@ -60,7 +60,7 @@ This file outlines the development steps and serves as a checklist to track prog
 
 ## Phase 4: Chrome Extension Frontend
 
-- [ ] **Basic Structure & Authentication Trigger**
+- [x] **Basic Structure & Authentication Trigger**
     - [x] Create `extension` directory.
     - [x] Create `manifest.json` (version 3):
         - [x] Define name, version, description.
