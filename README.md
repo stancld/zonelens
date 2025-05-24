@@ -9,6 +9,9 @@ ______________________________________________________________________
 
 </div>
 
+> [!NOTE]
+> This app is in no way affiliated with or part of the official Strava software suite.
+
 ## ✨ Project Goal
 
 This project enhances the Strava web experience by displaying aggregated Heart Rate (HR) zone data directly on the user's Training Calendar. It involves a Chrome Extension that communicates with a Django backend to fetch, process, and visualize activity data from the Strava API.
