@@ -73,223 +73,244 @@ function formatSecondsToHms(totalSeconds) {
     return `${minutes}m`;
 }
 
-function findMatchingZoneKey(simplifiedZone, zoneTimesObject) {
-  // simplifiedZone is like 'zone5', zoneTimesObject is like {'Z5 Anaerobic': 123, ...}
-  // This regex looks for "Z<number>" at the start of the key,
-  // ensuring it's not followed by another digit (e.g., Z1 should not match Z10).
-  const prefixPattern = new RegExp("^" + simplifiedZone.replace('zone', 'Z') + "($|[^0-9])", "i");
-  for (const key in zoneTimesObject) {
-    if (prefixPattern.test(key)) {
-      return key;
-    }
-  }
-  console.warn(`No matching key found for simplified zone '${simplifiedZone}' in`, zoneTimesObject);
-  return null;
-}
-
 function renderMonthlySummary(monthKey, data) {
-  let summaryContainer = document.getElementById(MONTHLY_SUMMARY_ID);
-  if (!summaryContainer) {
-    summaryContainer = document.createElement('div');
-    summaryContainer.id = MONTHLY_SUMMARY_ID;
-    document.body.prepend(summaryContainer); // Prepend to body for now
-  }
+    let summaryContainer = document.getElementById(MONTHLY_SUMMARY_ID);
+    if (!summaryContainer) {
+        summaryContainer = document.createElement('div');
+        summaryContainer.id = MONTHLY_SUMMARY_ID;
+        document.body.prepend(summaryContainer); // Prepend to body for now
+    }
 
-  const totalMonthSeconds = Object.values(data.totalSummary).reduce((sum, time) => sum + time, 0);
-  if (totalMonthSeconds === 0) {
-    summaryContainer.innerHTML = `<div class="strava-zones-header"><h3>No HR Data for ${data.displayName}</h3></div>`;
-    return;
-  }
+    const totalMonthSeconds = Object.values(data.totalSummary).reduce((sum, time) => sum + time, 0);
+    if (totalMonthSeconds === 0) {
+        summaryContainer.innerHTML = `<div class="strava-zones-header"><h3>No HR Data for ${data.displayName}</h3></div>`;
+        return;
+    }
 
-  let contentHtml = `<div class="strava-zones-header"><h3>${data.displayName} HR Zone Summary</h3></div>`;
-  contentHtml += '<div class="strava-zones-content">';
+    let contentHtml = `<div class="strava-zones-header"><h3>${data.displayName} HR Zone Summary</h3></div>`;
+    contentHtml += '<div class="strava-zones-content">';
 
-  const zonesOrder = ['zone5', 'zone4', 'zone3', 'zone2', 'zone1']; // Display order
+    // Dynamically generate orderedSimplifiedZoneKeys from data.zoneDefinitions
+    const simplifiedZoneKeys = Object.keys(data.zoneDefinitions || {});
+    if (simplifiedZoneKeys.length === 0) {
+        console.warn("No zone definitions found in data.zoneDefinitions for monthly summary.");
+        summaryContainer.innerHTML += '<p>No heart rate zone definitions found.</p>';
+        contentHtml += '</div>';
+        summaryContainer.innerHTML = contentHtml;
+        return;
+    }
 
-  for (const zone of zonesOrder) {
-    const actualZoneKey = findMatchingZoneKey(zone, data.totalSummary);
-    const timeSeconds = actualZoneKey ? data.totalSummary[actualZoneKey] : 0;
-    const percentage = totalMonthSeconds > 0 ? (timeSeconds / totalMonthSeconds) * 100 : 0;
-    const timeFormatted = formatSecondsToHms(timeSeconds);
+    simplifiedZoneKeys.sort((a, b) => {
+        const numA = parseInt(a.replace('zone', ''), 10);
+        const numB = parseInt(b.replace('zone', ''), 10);
+        return numA - numB;
+    });
+    const orderedSimplifiedZoneKeys = simplifiedZoneKeys.reverse(); // e.g., ['zone5', 'zone4', ..., 'zone1']
 
-    contentHtml += `
-      <div class="zone-row">
-        <span class="zone-label">Zone ${zone.slice(-1)}: ${data.zoneDefinitions[zone]}</span>
-        <div class="zone-bar-container">
-          <div class="zone-bar ${zone}" style="width: ${percentage.toFixed(1)}%;"></div>
-          <span class="zone-time-text">${timeFormatted} (${percentage.toFixed(0)}%)</span>
-        </div>
-      </div>
-    `;
-  }
-  contentHtml += '</div>';
-  summaryContainer.innerHTML = contentHtml;
-  console.log(`Monthly summary for ${monthKey} rendered.`);
+    for (const simplifiedZoneKey of orderedSimplifiedZoneKeys) { // e.g., 'zone5', 'zone4'
+        const zoneNumberStr = simplifiedZoneKey.replace('zone', ''); // e.g., '5', '4'
+
+        const actualUserDefinedName = data.zoneDefinitions[simplifiedZoneKey];
+        const timeSeconds = actualUserDefinedName ? (data.totalSummary[actualUserDefinedName] || 0) : 0;
+
+        const percentage = totalMonthSeconds > 0 ? (timeSeconds / totalMonthSeconds) * 100 : 0;
+        const timeFormatted = formatSecondsToHms(timeSeconds);
+
+        const displayFriendlyZoneName = actualUserDefinedName || `Zone ${zoneNumberStr}`;
+
+        contentHtml += `
+          <div class="zone-row">
+            <span class="zone-label">Z${zoneNumberStr}: ${displayFriendlyZoneName}</span>
+            <div class="zone-bar-container">
+              <div class="zone-bar zone${zoneNumberStr}" style="width: ${percentage.toFixed(1)}%;"></div>
+              <span class="zone-time-text">${timeFormatted} (${percentage.toFixed(0)}%)</span>
+            </div>
+          </div>
+        `;
+    }
+    contentHtml += '</div>';
+    summaryContainer.innerHTML = contentHtml;
+    console.log(`Monthly summary for ${monthKey} rendered.`);
 }
 
 function renderWeeklySummaries(monthKey, data) {
-  console.log(`Attempting to render weekly summaries for ${monthKey}.`);
+    console.log(`Attempting to render weekly summaries for ${monthKey}.`);
 
-  // **IMPORTANT**: This selector needs to be updated based on Strava's actual calendar structure.
-  // Use Chrome DevTools to inspect the calendar and find the correct selector for week rows.
-  // Examples: 'div.date-grid > div.week', 'table#calendar-table tbody tr',
-  // '.rc-MonthWrapper .rc-Week'
-  const weekRowSelector = 'table.month-calendar.marginless tbody tr';
-  const weekRows = document.querySelectorAll(weekRowSelector);
+    // **IMPORTANT**: This selector needs to be updated based on Strava's actual calendar structure.
+    // Use Chrome DevTools to inspect the calendar and find the correct selector for week rows.
+    // Examples: 'div.date-grid > div.week', 'table#calendar-table tbody tr',
+    // '.rc-MonthWrapper .rc-Week'
+    const weekRowSelector = 'table.month-calendar.marginless tbody tr';
+    const weekRows = document.querySelectorAll(weekRowSelector);
 
-  if (!weekRows.length) {
-    console.warn(`No week rows found with selector: '${weekRowSelector}'. Weekly summaries not rendered.`);
-    return;
-  }
-
-  const zonesOrder = ['zone5', 'zone4', 'zone3', 'zone2', 'zone1'];
-
-  weekRows.forEach((row, index) => {
-    if (data.weeklySummaries && data.weeklySummaries[index] && data.weeklySummaries[index].zone_times_seconds) {
-      const weeklyZoneTimes = data.weeklySummaries[index].zone_times_seconds; // Get the nested object
-      const totalWeekSeconds = zonesOrder.reduce((sum, zoneKey) => {
-        const actualZoneKey = findMatchingZoneKey(zoneKey, weeklyZoneTimes);
-        return sum + (actualZoneKey ? weeklyZoneTimes[actualZoneKey] : 0);
-      }, 0);
-
-      if (totalWeekSeconds > 0) {
-        const panelContainer = document.createElement('div');
-        panelContainer.className = WEEKLY_SUMMARY_CLASS;
-
-        let panelHtml = '';
-        for (const zoneKey of zonesOrder) {
-          const actualZoneKey = findMatchingZoneKey(zoneKey, weeklyZoneTimes);
-          const timeSeconds = actualZoneKey ? weeklyZoneTimes[actualZoneKey] : 0;
-          const percentage = totalWeekSeconds > 0 ? (timeSeconds / totalWeekSeconds) * 100 : 0;
-          const timeFormatted = formatSecondsToHms(timeSeconds);
-
-          panelHtml += `
-            <div class="weekly-zone-row">
-              <span class="weekly-zone-label">Z${zoneKey.slice(-1)}</span>
-              <div class="weekly-zone-bar-container">
-                <div class="weekly-zone-bar ${zoneKey}" style="width: ${percentage.toFixed(1)}%;"></div>
-              </div>
-              <span class="weekly-zone-time-text">${timeFormatted} (${percentage.toFixed(0)}%)</span>
-            </div>
-          `;
-        }
-        panelContainer.innerHTML = panelHtml;
-
-        // Create a new table cell (td) to hold our summary panel
-        const summaryCell = document.createElement('td');
-        summaryCell.className = 'strava-zones-weekly-summary-cell'; // For potential styling
-        summaryCell.style.verticalAlign = 'top'; // Align panel to the top of the cell
-        summaryCell.style.padding = '2px'; // Add a little padding
-
-        summaryCell.appendChild(panelContainer);
-        row.appendChild(summaryCell); // Add the new cell to the row (tr)
-      }
-    } else {
-      // console.log(`No weekly data for week index ${index} or week row not found`);
+    if (!weekRows.length) {
+        console.warn(`No week rows found with selector: '${weekRowSelector}'. Weekly summaries not rendered.`);
+        return;
     }
-  });
-  console.log(`Processed ${weekRows.length} potential week rows for weekly summaries.`);
+
+    // Dynamically generate orderedSimplifiedZoneKeys from data.zoneDefinitions
+    const simplifiedZoneKeys = Object.keys(data.zoneDefinitions || {});
+    if (simplifiedZoneKeys.length === 0) {
+        console.warn("No zone definitions found in data.zoneDefinitions for weekly summaries. Cannot render.");
+        return;
+    }
+
+    simplifiedZoneKeys.sort((a, b) => {
+        const numA = parseInt(a.replace('zone', ''), 10);
+        const numB = parseInt(b.replace('zone', ''), 10);
+        return numA - numB;
+    });
+    const orderedSimplifiedZoneKeys = simplifiedZoneKeys.reverse(); // e.g., ['zone5', 'zone4', ..., 'zone1']
+
+    weekRows.forEach((row, index) => {
+        if (data.weeklySummaries && data.weeklySummaries[index] && data.weeklySummaries[index].zone_times_seconds) {
+            const weeklyActivityZoneTimes = data.weeklySummaries[index].zone_times_seconds;
+
+            let totalWeekSeconds = 0;
+            for (const key of orderedSimplifiedZoneKeys) {
+                const actualName = data.zoneDefinitions[key];
+                if (actualName && weeklyActivityZoneTimes[actualName]) {
+                    totalWeekSeconds += weeklyActivityZoneTimes[actualName];
+                }
+            }
+
+            if (totalWeekSeconds > 0) {
+                const panelContainer = document.createElement('div');
+                panelContainer.className = WEEKLY_SUMMARY_CLASS;
+
+                let panelHtml = '';
+                for (const simplifiedZoneKey of orderedSimplifiedZoneKeys) {
+                    const zoneNumberStr = simplifiedZoneKey.replace('zone', '');
+
+                    const actualUserDefinedName = data.zoneDefinitions[simplifiedZoneKey];
+                    const timeSeconds = actualUserDefinedName ? (weeklyActivityZoneTimes[actualUserDefinedName] || 0) : 0;
+
+                    const percentage = totalWeekSeconds > 0 ? (timeSeconds / totalWeekSeconds) * 100 : 0;
+                    const timeFormatted = formatSecondsToHms(timeSeconds);
+
+                    panelHtml += `
+                      <div class="weekly-zone-row">
+                        <span class="weekly-zone-label">Z${zoneNumberStr}</span>
+                        <div class="weekly-zone-bar-container">
+                          <div class="weekly-zone-bar zone${zoneNumberStr}" style="width: ${percentage.toFixed(1)}%;"></div>
+                        </div>
+                        <span class="weekly-zone-time-text">${timeFormatted} (${percentage.toFixed(0)}%)</span>
+                      </div>
+                    `;
+                }
+                panelContainer.innerHTML = panelHtml;
+
+                // Create a new table cell (td) to hold our summary panel
+                const summaryCell = document.createElement('td');
+                summaryCell.className = 'strava-zones-weekly-summary-cell'; // For potential styling
+                summaryCell.style.verticalAlign = 'top'; // Align panel to the top of the cell
+                summaryCell.style.padding = '2px'; // Add a little padding
+
+                summaryCell.appendChild(panelContainer);
+                row.appendChild(summaryCell); // Add the new cell to the row (tr)
+            }
+        } else {
+            // console.log(`No weekly data for week index ${index} or week row not found`);
+        }
+    });
+    console.log(`Processed ${weekRows.length} potential week rows for weekly summaries.`);
 }
 
 function clearAllInjectedUI() {
-  const monthlyElement = document.getElementById(MONTHLY_SUMMARY_ID);
-  if (monthlyElement) {
-    monthlyElement.remove();
-    console.log("Monthly summary element removed.");
-  }
+    const monthlyElement = document.getElementById(MONTHLY_SUMMARY_ID);
+    if (monthlyElement) {
+        monthlyElement.remove();
+        console.log("Monthly summary element removed.");
+    }
 
-  const weeklyElements = document.querySelectorAll('.' + WEEKLY_SUMMARY_CLASS);
-  weeklyElements.forEach(el => el.remove());
-  if (weeklyElements.length > 0) {
-    console.log(`${weeklyElements.length} weekly summary elements removed.`);
-  }
+    const weeklyElements = document.querySelectorAll('.' + WEEKLY_SUMMARY_CLASS);
+    weeklyElements.forEach(el => el.remove());
+    if (weeklyElements.length > 0) {
+        console.log(`${weeklyElements.length} weekly summary elements removed.`);
+    }
 }
 
 function initHrZoneDisplay() {
-  const currentPath = window.location.pathname; // e.g., /athlete/calendar/2024
-  const currentHash = window.location.hash;    // e.g., "#Jul"
+    const currentPath = window.location.pathname; // e.g., /athlete/calendar/2024
+    const currentHash = window.location.hash;    // e.g., "#Jul"
 
-  // Extract month key from hash (e.g., "Jul" from "#Jul" or "#Jul-2024")
-  const monthKey = currentHash.startsWith('#') ? currentHash.substring(1, 4) : null;
+    // Extract month key from hash (e.g., "Jul" from "#Jul" or "#Jul-2024")
+    const monthKey = currentHash.startsWith('#') ? currentHash.substring(1, 4) : null;
 
-  // Simple check for 3-letter month abbreviations
-  if (monthKey && /^[A-Za-z]{3}$/.test(monthKey)) {
-    console.log(`Attempting to display HR Zones for month: ${monthKey}`);
-    clearAllInjectedUI(); // Use the updated clearing function
+    // Simple check for 3-letter month abbreviations
+    if (monthKey && /^[A-Za-z]{3}$/.test(monthKey)) {
+        console.log(`Attempting to display HR Zones for month: ${monthKey}`);
+        clearAllInjectedUI(); // Use the updated clearing function
 
-    let yearToUse = null;
+        let yearToUse = null;
 
-    // 1. Try to extract year from pathname
-    const pathParts = currentPath.split('/');
-    // Expected: /athlete/calendar/YYYY or /athletes/NNNNN/calendar/YYYY
-    const calendarKeywordIndex = pathParts.indexOf('calendar');
-    if (calendarKeywordIndex !== -1 && pathParts.length > calendarKeywordIndex + 1) {
-      const yearStr = pathParts[calendarKeywordIndex + 1];
-      if (/^\d{4}$/.test(yearStr)) {
-        yearToUse = parseInt(yearStr, 10);
-        console.log(`Year extracted from path: ${yearToUse}`);
-      }
-    }
-
-    // 2. If not in path, try from DOM element
-    if (!yearToUse) {
-      const yearElement = document.querySelector('.selected-month .year'); // Selector from original snippet
-      if (yearElement && yearElement.textContent) {
-          const parsedYear = parseInt(yearElement.textContent.trim(), 10);
-          if (!isNaN(parsedYear)) {
-              yearToUse = parsedYear;
-              console.log(`Year extracted from DOM: ${yearToUse}`);
-          }
-      }
-    }
-
-    // 3. If still no year, default to current year
-    if (!yearToUse) {
-      yearToUse = new Date().getFullYear();
-      console.log(`Year defaulted to current system year: ${yearToUse}`);
-    }
-
-    console.log(`Using year: ${yearToUse} for month: ${monthKey}`);
-
-    fetchActivityData(yearToUse, monthKey).then(data => {
-      // Check if monthly_summary and its zone_times_seconds exist and are not empty
-      if (data && data.monthly_summary && data.monthly_summary.zone_times_seconds && Object.keys(data.monthly_summary.zone_times_seconds).length > 0) { // Check if data is valid
-        // Ensure data.displayName and data.zoneDefinitions are present, or have fallbacks
-        const displayData = {
-            displayName: monthMap[monthKey] || monthKey, // Use monthMap, as data.displayName is not from API
-            year: data.year || yearToUse,
-            totalSummary: data.monthly_summary.zone_times_seconds, // Correct path to zone times
-            // Use fetched zoneDefinitions, or a static fallback if not provided
-            zoneDefinitions: { // data.zoneDefinitions is not from API, using fallback
-                zone5: "Anaerobic", zone4: "Threshold", zone3: "Tempo", zone2: "Endurance (Easy)", zone1: "Warm up (Easy)"
-            },
-            weeklySummaries: data.weekly_summaries || [] // Correct key for weekly summaries
-        };
-        renderMonthlySummary(monthKey, displayData);
-        renderWeeklySummaries(monthKey, displayData);
-      } else {
-        console.warn(`No valid data received for ${monthMap[monthKey] || monthKey}, ${yearToUse} or error in fetching. Monthly summary was:`, data ? data.monthly_summary : 'no data');
-        // Display a message indicating no data or an error
-        const summaryContainer = document.getElementById(MONTHLY_SUMMARY_ID) || document.createElement('div');
-        if (!summaryContainer.id) {
-            summaryContainer.id = MONTHLY_SUMMARY_ID;
-            document.body.prepend(summaryContainer);
+        // 1. Try to extract year from pathname
+        const pathParts = currentPath.split('/');
+        // Expected: /athlete/calendar/YYYY or /athletes/NNNNN/calendar/YYYY
+        const calendarKeywordIndex = pathParts.indexOf('calendar');
+        if (calendarKeywordIndex !== -1 && pathParts.length > calendarKeywordIndex + 1) {
+            const yearStr = pathParts[calendarKeywordIndex + 1];
+            if (/^\d{4}$/.test(yearStr)) {
+                yearToUse = parseInt(yearStr, 10);
+                console.log(`Year extracted from path: ${yearToUse}`);
+            }
         }
-        summaryContainer.innerHTML = `<div class="strava-zones-header"><h3>Data for ${monthMap[monthKey] || monthKey} ${yearToUse} not available.</h3></div>`;
-      }
-    });
 
-  } else {
-    console.log("Not on a specific month view, clearing summary.", monthKey);
-    clearAllInjectedUI();
-  }
+        // 2. If not in path, try from DOM element
+        if (!yearToUse) {
+            const yearElement = document.querySelector('.selected-month .year'); // Selector from original snippet
+            if (yearElement && yearElement.textContent) {
+                const parsedYear = parseInt(yearElement.textContent.trim(), 10);
+                if (!isNaN(parsedYear)) {
+                    yearToUse = parsedYear;
+                    console.log(`Year extracted from DOM: ${yearToUse}`);
+                }
+            }
+        }
+
+        // 3. If still no year, default to current year
+        if (!yearToUse) {
+            yearToUse = new Date().getFullYear();
+            console.log(`Year defaulted to current system year: ${yearToUse}`);
+        }
+
+        console.log(`Using year: ${yearToUse} for month: ${monthKey}`);
+
+        fetchActivityData(yearToUse, monthKey).then(data => {
+            // Check if monthly_summary and its zone_times_seconds exist and are not empty
+            if (data && data.monthly_summary && data.monthly_summary.zone_times_seconds && Object.keys(data.monthly_summary.zone_times_seconds).length > 0) { // Check if data is valid
+                const displayData = {
+                    displayName: monthMap[monthKey] || monthKey,
+                    year: data.year || yearToUse,
+                    totalSummary: data.monthly_summary.zone_times_seconds,
+                    zoneDefinitions: data.zone_definitions || {},
+                    weeklySummaries: data.weekly_summaries || []
+                };
+                renderMonthlySummary(monthKey, displayData);
+                renderWeeklySummaries(monthKey, displayData);
+            } else {
+                console.warn(`No valid data received for ${monthMap[monthKey] || monthKey}, ${yearToUse} or error in fetching. Monthly summary was:`, data ? data.monthly_summary : 'no data');
+                // Display a message indicating no data or an error
+                const summaryContainer = document.getElementById(MONTHLY_SUMMARY_ID) || document.createElement('div');
+                if (!summaryContainer.id) {
+                    summaryContainer.id = MONTHLY_SUMMARY_ID;
+                    document.body.prepend(summaryContainer);
+                }
+                summaryContainer.innerHTML = `<div class="strava-zones-header"><h3>Data for ${monthMap[monthKey] || monthKey} ${yearToUse} not available.</h3></div>`;
+            }
+        });
+
+    } else {
+        console.log("Not on a specific month view, clearing summary.", monthKey);
+        clearAllInjectedUI();
+    }
 }
 
 // Initial load
 if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', initHrZoneDisplay);
+    document.addEventListener('DOMContentLoaded', initHrZoneDisplay);
 } else {
-  initHrZoneDisplay();
+    initHrZoneDisplay();
 }
 
 // Listen for hash changes (SPA navigation between months)

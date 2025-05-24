@@ -19,11 +19,17 @@ if TYPE_CHECKING:
 	from typing import Any
 
 
+DEFAULT_ZONES_NAMES_MAPPING = {
+	1: "Recovery (Easy)",
+	2: "Endurance (Easy)",
+	3: "Tempo",
+	4: "Threshold",
+	5: "Anaerobic",
+}
+
+
 class StravaHRWorker:
-	"""
-	Worker to fetch Strava activities for a user, process heart rate data,
-	and store time-in-zone information.
-	"""
+	"""Fetch activities for a user, process heart rate data and store time-in-zone information."""
 
 	def __init__(self, user_strava_id: int):
 		try:
@@ -205,26 +211,20 @@ class StravaHRWorker:
 
 			# Strava returned HR zones, so create them
 			new_zones_to_create = []
-			for i, zone_data in enumerate(heart_rate_zones_data):
+			for idx, zone_data in enumerate(heart_rate_zones_data, start=1):
 				min_hr = zone_data.get("min")
-				max_hr_strava = zone_data.get(
-					"max"
-				)  # Renamed to avoid clash with model field name
+				max_hr_strava = zone_data.get("max")
 
 				# Strava's last zone has max as -1, interpret as no upper limit
 				# PositiveIntegerField in model typically cannot be None and needs a value.
 				max_hr_db = 220 if max_hr_strava == -1 or max_hr_strava is None else max_hr_strava
 
-				# Assuming min_hr is always present and valid from Strava.
-				# If min_hr could be missing, handle similarly.
-				# min_hr_db = min_hr if min_hr is not None else 0 # Example
-
 				new_zones_to_create.append(
 					HeartRateZone(
 						config=config,
-						name=f"Z{i + 1}",  # Strava zones are typically Z1-Z5
-						order=i + 1,
-						min_hr=min_hr,  # Assumes min_hr is always present from Strava
+						name=DEFAULT_ZONES_NAMES_MAPPING[idx],
+						order=idx,
+						min_hr=min_hr,
 						max_hr=max_hr_db,
 					)
 				)

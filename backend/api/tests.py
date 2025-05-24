@@ -1218,6 +1218,25 @@ class ZoneSummaryViewTests(APITestCase):
 			activity_date=activity3_date,
 		)
 
+		self.default_config = CustomZonesConfig.objects.create(
+			user=self.strava_user, activity_type=ActivityType.DEFAULT
+		)
+		self.dz1 = HeartRateZone.objects.create(
+			config=self.default_config, name="Z1 Endurance", min_hr=0, max_hr=120, order=1
+		)
+		self.dz2 = HeartRateZone.objects.create(
+			config=self.default_config, name="Z2 Moderate", min_hr=121, max_hr=140, order=2
+		)
+		self.dz3 = HeartRateZone.objects.create(
+			config=self.default_config, name="Z3 Tempo", min_hr=141, max_hr=160, order=3
+		)
+		self.dz4 = HeartRateZone.objects.create(
+			config=self.default_config, name="Z4 Threshold", min_hr=161, max_hr=180, order=4
+		)
+		self.dz5 = HeartRateZone.objects.create(
+			config=self.default_config, name="Z5 Anaerobic", min_hr=181, max_hr=200, order=5
+		)
+
 	def test_get_zone_summary_calculated(self) -> None:
 		url = reverse("zone_summary")
 		response = self.client.get(url, {"year": 2025, "month": 3})
@@ -1310,6 +1329,25 @@ class ZoneSummaryModelTests(TestCase):
 			token_expires_at=timezone.now() + timedelta(hours=1),
 			user=self.django_user,
 			scope="read,activity:read_all",
+		)
+
+		self.default_config = CustomZonesConfig.objects.create(
+			user=self.strava_user, activity_type=ActivityType.DEFAULT
+		)
+		self.dz1 = HeartRateZone.objects.create(
+			config=self.default_config, name="Z1 Endurance", min_hr=0, max_hr=120, order=1
+		)
+		self.dz2 = HeartRateZone.objects.create(
+			config=self.default_config, name="Z2 Moderate", min_hr=121, max_hr=140, order=2
+		)
+		self.dz3 = HeartRateZone.objects.create(
+			config=self.default_config, name="Z3 Tempo", min_hr=141, max_hr=160, order=3
+		)
+		self.dz4 = HeartRateZone.objects.create(
+			config=self.default_config, name="Z4 Threshold", min_hr=161, max_hr=180, order=4
+		)
+		self.dz5 = HeartRateZone.objects.create(
+			config=self.default_config, name="Z5 Anaerobic", min_hr=181, max_hr=200, order=5
 		)
 
 	def test_get_or_create_summary_weekly_with_month_context(self) -> None:

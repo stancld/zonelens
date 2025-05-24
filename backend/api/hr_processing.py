@@ -162,7 +162,7 @@ def calculate_time_in_zones(
 		# Fall through, determine_hr_zone will return None for all HRs.
 	else:
 		try:
-			for zone_model in zones_config.zones_definition.all():
+			for zone_model in zones_config.zones_definition.all().order_by("order"):
 				time_spent_in_zones[zone_model.name] = 0
 		except Exception as e:  # Handle DB error if zones_definition can't be accessed
 			logger.error(
