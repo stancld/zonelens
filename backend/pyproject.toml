@@ -16,6 +16,7 @@ dependencies = [
     "django-cors-headers",
     "django-extensions",
     "djangorestframework",
+    "gunicorn",
     "psycopg2-binary",
     "pyOpenSSL",
     "python-dotenv",

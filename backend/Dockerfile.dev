@@ -11,7 +11,7 @@ RUN apt-get update && apt-get install -y \
 COPY --from=ghcr.io/astral-sh/uv:0.6.11 /uv /bin/uv
 
 # Python installation
-ENV PYTHON=3.11
+ENV PYTHON_VERSION=3.12
 ENV PYTHON_DIR=/opt/python
 # Set Python path to include the app directory
 ENV PYTHONPATH=/app
