@@ -37,18 +37,11 @@ class StravaHRWorker:
 		except StravaUser.DoesNotExist as e:
 			raise ValueError(f"User with Strava ID {user_strava_id} not found.") from e
 
-		# Initialize Strava API client
-		# This assumes StravaApiClient takes a StravaUser object for authentication
 		self.strava_client = StravaApiClient(self.user)
 		self.logger = get_logger(__name__)
 
 	def _get_default_zones_config(self) -> CustomZonesConfig | None:
-		"""
-		Retrieves the default CustomZonesConfig for the user.
-		Logs a warning if no default config or no zones are defined within it.
-		"""
 		try:
-			# Attempt to get the default configuration for the user
 			config = CustomZonesConfig.objects.get(
 				user=self.user, activity_type=ActivityType.DEFAULT
 			)
