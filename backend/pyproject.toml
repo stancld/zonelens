@@ -11,17 +11,17 @@ authors = [
 ]
 requires-python = ">=3.12"
 dependencies = [
-    "django",
-    "djangorestframework",
-    "psycopg2-binary",
-    "requests",
-    "python-dotenv",
     "cryptography",
-    "pytz",
+    "django",
     "django-cors-headers",
     "django-extensions",
-    "werkzeug",
+    "djangorestframework",
+    "psycopg2-binary",
     "pyOpenSSL",
+    "python-dotenv",
+    "pytz",
+    "requests",
+    "werkzeug",
 ]
 
 [project.optional-dependencies]
@@ -38,7 +38,7 @@ dev = [
 packages = ["strava-zones-backend"]
 
 [tool.ruff]
-target-version = "py311"
+target-version = "py312"
 line-length = 99
 include = ["pyproject.toml", "strava-zones-backend/**/*.py", "tests/**/*.py"]
 
@@ -117,7 +117,7 @@ max-complexity = 12
 indent-style = "tab"
 
 [tool.mypy]
-python_version = "3.11"
+python_version = "3.12"
 warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = true
