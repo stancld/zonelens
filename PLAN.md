@@ -111,7 +111,7 @@ This file outlines the development steps and serves as a checklist to track prog
   - [ ] Set up CloudFront CDN for frontend (optional, but good practice).
 
 - [ ] **Backend Deployment (Django)**
-  - [ ] Containerize the Django application (Docker).
+  - [x] Containerize the Django application (Docker).
   - [ ] Set up a process manager (e.g., Gunicorn, Supervisor) on EC2.
   - [ ] Configure a web server (e.g., Nginx) as a reverse proxy on EC2.
   - [ ] Manage static files (collectstatic) and media files.
