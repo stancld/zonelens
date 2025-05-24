@@ -955,7 +955,7 @@ class StravaHRWorkerTests(TestCase):
 		).delete()
 		worker = StravaHRWorker(user_strava_id=self.strava_user.strava_id)
 		with self.assertRaisesRegex(
-			ValueError, f"Zones config not found for user {self.strava_user.strava_id}."
+			ValueError, f"Default zones config not found for user {self.strava_user.strava_id}."
 		):
 			worker.process_user_activities()
 
@@ -1129,6 +1129,167 @@ class StravaHRWorkerTests(TestCase):
 		self.assertEqual(
 			ActivityZoneTimes.objects.count(), 0
 		)  # No zones should be saved if streams fail
+
+	def test__get_all_user_zone_configs(self) -> None:  # noqa: PLR0915
+		worker = StravaHRWorker(user_strava_id=self.strava_user.strava_id)
+
+		# 1. No configurations exist
+		CustomZonesConfig.objects.filter(user=self.strava_user).delete()
+		# _get_default_zones_config will be called internally and return None
+		with self.assertLogs(worker.logger, level="INFO") as cm_no_config:
+			configs_map = worker._get_all_user_zone_configs()
+		self.assertIn(
+			f"No explicit DEFAULT config in DB for user {self.strava_user.strava_id}",
+			cm_no_config.output[0],
+		)
+		self.assertEqual(len(configs_map), 0)  # Expect empty map if no default is found/created
+		self.assertIsNone(configs_map.get(ActivityType.DEFAULT))  # type: ignore[call-overload]
+
+		# 2. Only DEFAULT config exists
+		CustomZonesConfig.objects.filter(user=self.strava_user).delete()
+		default_config = CustomZonesConfig.objects.create(
+			user=self.strava_user, activity_type=ActivityType.DEFAULT
+		)
+		# Add a zone definition to make it a 'complete' config for this test part
+		HeartRateZone.objects.create(
+			config=default_config, name="Z1", min_hr=60, max_hr=120, order=1
+		)
+		configs_map = worker._get_all_user_zone_configs()
+		self.assertEqual(len(configs_map), 1)
+		self.assertEqual(configs_map.get(ActivityType.DEFAULT), default_config)  # type: ignore[call-overload]
+
+		# 3. DEFAULT and RIDE configs exist
+		CustomZonesConfig.objects.filter(user=self.strava_user).delete()
+		default_config_2 = CustomZonesConfig.objects.create(
+			user=self.strava_user, activity_type=ActivityType.DEFAULT
+		)
+		HeartRateZone.objects.create(
+			config=default_config_2, name="Z1", min_hr=60, max_hr=120, order=1
+		)
+		ride_config = CustomZonesConfig.objects.create(
+			user=self.strava_user, activity_type=ActivityType.RIDE
+		)
+		HeartRateZone.objects.create(
+			config=ride_config, name="Z1-Ride", min_hr=70, max_hr=130, order=1
+		)
+		configs_map = worker._get_all_user_zone_configs()
+		self.assertEqual(len(configs_map), 2)
+		self.assertEqual(configs_map.get(ActivityType.DEFAULT), default_config_2)  # type: ignore[call-overload]
+		self.assertEqual(configs_map.get(ActivityType.RIDE), ride_config)  # type: ignore[call-overload]
+
+		# 4. DEFAULT, RIDE, and RUN configs exist
+		CustomZonesConfig.objects.filter(user=self.strava_user).delete()
+		default_config_3 = CustomZonesConfig.objects.create(
+			user=self.strava_user, activity_type=ActivityType.DEFAULT
+		)
+		HeartRateZone.objects.create(
+			config=default_config_3, name="Z1", min_hr=60, max_hr=120, order=1
+		)
+		ride_config_2 = CustomZonesConfig.objects.create(
+			user=self.strava_user, activity_type=ActivityType.RIDE
+		)
+		HeartRateZone.objects.create(
+			config=ride_config_2, name="Z1-Ride", min_hr=70, max_hr=130, order=1
+		)
+		run_config = CustomZonesConfig.objects.create(
+			user=self.strava_user, activity_type=ActivityType.RUN
+		)
+		HeartRateZone.objects.create(
+			config=run_config, name="Z1-Run", min_hr=80, max_hr=140, order=1
+		)
+		configs_map = worker._get_all_user_zone_configs()
+		self.assertEqual(len(configs_map), 3)
+		self.assertEqual(configs_map.get(ActivityType.DEFAULT), default_config_3)  # type: ignore[call-overload]
+		self.assertEqual(configs_map.get(ActivityType.RIDE), ride_config_2)  # type: ignore[call-overload]
+		self.assertEqual(configs_map.get(ActivityType.RUN), run_config)  # type: ignore[call-overload]
+
+		# 5a. Only RIDE config exists (no explicit DEFAULT), _get_default_zones_config returns None
+		CustomZonesConfig.objects.filter(user=self.strava_user).delete()
+		ride_only_config = CustomZonesConfig.objects.create(
+			user=self.strava_user, activity_type=ActivityType.RIDE
+		)
+		HeartRateZone.objects.create(
+			config=ride_only_config, name="Z1-Ride", min_hr=70, max_hr=130, order=1
+		)
+		with patch.object(
+			worker, "_get_default_zones_config", return_value=None
+		) as mock_get_default:
+			with self.assertLogs(worker.logger, level="INFO") as cm_ride_only:
+				configs_map = worker._get_all_user_zone_configs()
+			mock_get_default.assert_called_once()
+		self.assertIn(
+			f"No explicit DEFAULT config in DB for user {self.strava_user.strava_id}",
+			cm_ride_only.output[0],
+		)
+		self.assertEqual(len(configs_map), 1)  # Only RIDE config, as DEFAULT was None
+		self.assertEqual(configs_map.get(ActivityType.RIDE), ride_only_config)  # type: ignore[call-overload]
+		self.assertIsNone(configs_map.get(ActivityType.DEFAULT))  # type: ignore[call-overload]
+
+		# 5b. Only RIDE config exists, _get_default_zones_config returns a new DEFAULT
+		CustomZonesConfig.objects.filter(user=self.strava_user).delete()
+		ride_only_config_2 = CustomZonesConfig.objects.create(
+			user=self.strava_user, activity_type=ActivityType.RIDE
+		)
+		HeartRateZone.objects.create(
+			config=ride_only_config_2, name="Z1-Ride", min_hr=70, max_hr=130, order=1
+		)
+		mocked_default_config = CustomZonesConfig(
+			user=self.strava_user, activity_type=ActivityType.DEFAULT
+		)
+		# Not saving mocked_default_config to DB, just returning it from mock
+		with patch.object(
+			worker, "_get_default_zones_config", return_value=mocked_default_config
+		) as mock_get_default_2:
+			with self.assertLogs(worker.logger, level="INFO") as cm_ride_only_2:
+				configs_map = worker._get_all_user_zone_configs()
+			mock_get_default_2.assert_called_once()
+		self.assertIn(
+			f"No explicit DEFAULT config in DB for user {self.strava_user.strava_id}",
+			cm_ride_only_2.output[0],
+		)
+		self.assertEqual(len(configs_map), 2)
+		self.assertEqual(configs_map.get(ActivityType.RIDE), ride_only_config_2)  # type: ignore[call-overload]
+		self.assertEqual(configs_map.get(ActivityType.DEFAULT), mocked_default_config)  # type: ignore[call-overload]
+
+		# 6. Config with invalid activity_type string in DB
+		CustomZonesConfig.objects.filter(user=self.strava_user).delete()
+		default_config_invalid_sibling = CustomZonesConfig.objects.create(
+			user=self.strava_user, activity_type=ActivityType.DEFAULT
+		)
+		HeartRateZone.objects.create(
+			config=default_config_invalid_sibling, name="Z1", min_hr=60, max_hr=120, order=1
+		)
+		# Create a config with an invalid type via update to bypass model choices validation
+		invalid_config_obj = CustomZonesConfig.objects.create(
+			user=self.strava_user, activity_type="TEMP_VALID"
+		)
+		CustomZonesConfig.objects.filter(pk=invalid_config_obj.pk).update(
+			activity_type="INVALID_TYPE"
+		)
+
+		with self.assertLogs(worker.logger, level="ERROR") as cm_invalid_type:
+			configs_map = worker._get_all_user_zone_configs()
+		self.assertIn(
+			f"Invalid activity_type 'INVALID_TYPE' in DB for CustomZonesConfig {invalid_config_obj.pk}",  # noqa: E501
+			cm_invalid_type.output[0],
+		)
+		self.assertEqual(len(configs_map), 1)
+		self.assertEqual(configs_map.get(ActivityType.DEFAULT), default_config_invalid_sibling)  # type: ignore[call-overload]
+
+		# 7. Explicit DEFAULT config with no zone definitions
+		CustomZonesConfig.objects.filter(user=self.strava_user).delete()
+		default_no_zones = CustomZonesConfig.objects.create(
+			user=self.strava_user, activity_type=ActivityType.DEFAULT
+		)
+		# No HeartRateZone objects created for default_no_zones
+		with self.assertLogs(worker.logger, level="WARNING") as cm_no_zones:
+			configs_map = worker._get_all_user_zone_configs()
+		self.assertIn(
+			f"Explicit default CustomZonesConfig {default_no_zones.pk} for user {self.strava_user.strava_id} has no zone definitions",  # noqa: E501
+			cm_no_zones.output[0],
+		)
+		self.assertEqual(len(configs_map), 1)
+		self.assertEqual(configs_map.get(ActivityType.DEFAULT), default_no_zones)  # type: ignore[call-overload]
 
 
 class ZoneSummaryViewTests(APITestCase):

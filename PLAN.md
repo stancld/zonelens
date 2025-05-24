@@ -74,9 +74,9 @@ This file outlines the development steps and serves as a checklist to track prog
     - [x] Add button/link in popup to initiate auth (redirects to backend `/api/auth/strava`).
     - [ ] Create `background.js` to handle potential message passing.
     - [ ] Implement logic to store/manage backend session/token in `chrome.storage.local` after successful auth callback.
-- [ ] **Custom Zone UI**
+- [x] **Custom Zone UI**
     - [x] Enable configuring HR zones boundaries.
-    - [ ] Add form elements to define zone boundaries per activity type.
+    - [x] Add form elements to define zone boundaries per activity type.
     - [x] Implement JS in options/popup to:
         - [x] Fetch current settings from `GET /api/zones/settings`.
 - [x] **Calendar Injection & Data Display**
