@@ -16,7 +16,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libpq5 \
     && rm -rf /var/lib/apt/lists/*
 
-COPY --from=ghcr.io/astral-sh/uv:0.6.11 /uv /bin/uv
+COPY --from=ghcr.io/astral-sh/uv:0.7.8 /uv /bin/uv
 
 COPY pyproject.toml constraints.txt ./
 
