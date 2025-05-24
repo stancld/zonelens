@@ -15,8 +15,7 @@ OUTSIDE_ZONES_KEY = "Time Outside Defined Zones"
 def parse_activity_streams(
 	streams_data: dict[str, Any] | None,
 ) -> tuple[list[int] | None, list[int] | None]:
-	"""
-	Parses the raw activity stream data from Strava to extract time and heart rate series.
+	"""Parse the raw activity stream data from Strava to extract time and heart rate series.
 
 	Parameters
 	----------
@@ -45,7 +44,7 @@ def parse_activity_streams(
 
 	if isinstance(time_stream, dict) and isinstance(time_stream.get("data"), list):
 		time_data = time_stream["data"]
-		if not time_data:  # Handle empty list case
+		if not time_data:
 			logger.warning("Time stream data array is empty.")
 			time_data = None
 		elif not all(isinstance(t, int) for t in time_data):
@@ -56,7 +55,7 @@ def parse_activity_streams(
 
 	if isinstance(heartrate_stream, dict) and isinstance(heartrate_stream.get("data"), list):
 		heartrate_data = heartrate_stream["data"]
-		if not heartrate_data:  # Handle empty list case
+		if not heartrate_data:
 			logger.warning("Heartrate stream data array is empty.")
 			heartrate_data = None
 		elif not all(isinstance(hr, int) for hr in heartrate_data):
@@ -74,9 +73,8 @@ def parse_activity_streams(
 	return time_data, heartrate_data
 
 
-def determine_hr_zone(hr_value: int, zones_config: CustomZonesConfig) -> str | None:
-	"""
-	Determines the custom heart rate zone for a given heart rate value.
+def determine_hr_zone(hr_value: int, zones_config: CustomZonesConfig | None) -> str | None:
+	"""Determine the custom heart rate zone for a given heart rate value.
 
 	Returns
 	-------
@@ -91,12 +89,8 @@ def determine_hr_zone(hr_value: int, zones_config: CustomZonesConfig) -> str | N
 
 	try:
 		# Fetch all related HeartRateZone objects, ordered by min_hr
-		# The model's Meta.ordering might also apply, but explicit sort here is clearer for function's logic.  # noqa: E501
-		# Sorting by 'order' first could be an option if 'order' is reliably managed and intended for primary sort.  # noqa: E501
-		# For now, min_hr is the crucial sorting key for this function's logic.
 		all_zones = list(zones_config.zones_definition.order_by("min_hr"))
-
-	except Exception as e:  # Catch potential errors during DB query or related manager access
+	except Exception as e:
 		err_msg = (
 			f"Error accessing or sorting zones for user {zones_config.user_id}, "
 			f"activity type {zones_config.activity_type}. Error: {e}"
@@ -119,7 +113,6 @@ def determine_hr_zone(hr_value: int, zones_config: CustomZonesConfig) -> str | N
 		if zone.min_hr <= hr_value <= zone.max_hr:
 			return zone.name
 
-	# Construct message first to manage line length
 	defined_zones_str = ", ".join([f"{z.name}: {z.min_hr}-{z.max_hr}" for z in all_zones])
 	debug_msg = (
 		f"HR value {hr_value} is out of defined zones for user {zones_config.user_id}, "
@@ -134,8 +127,7 @@ def calculate_time_in_zones(
 	heartrate_data: list[int] | None,
 	zones_config: CustomZonesConfig | None,
 ) -> dict[str, int]:
-	"""
-	Calculates the total time spent in each custom heart rate zone for an activity.
+	"""Calculate the total time spent in each custom heart rate zone for an activity.
 
 	Parameters
 	----------
@@ -164,7 +156,7 @@ def calculate_time_in_zones(
 		try:
 			for zone_model in zones_config.zones_definition.all().order_by("order"):
 				time_spent_in_zones[zone_model.name] = 0
-		except Exception as e:  # Handle DB error if zones_definition can't be accessed
+		except Exception as e:
 			logger.error(
 				f"Error accessing zone definitions for config {zones_config.id}: {e}. "
 				"Proceeding as if no zones were defined."
@@ -174,18 +166,18 @@ def calculate_time_in_zones(
 
 	if not time_data or not heartrate_data:
 		logger.warning("Time or HR data is missing. Cannot calculate time in zones.")
-		return time_spent_in_zones  # Return initialized (mostly empty) dict
+		return time_spent_in_zones
 
 	if len(time_data) != len(heartrate_data):
 		logger.warning(
 			"Time and HR data lists have different lengths. "
 			"Cannot accurately calculate time in zones."
 		)
-		return time_spent_in_zones  # Return initialized dict
+		return time_spent_in_zones
 
 	if len(time_data) < 2:
 		logger.info("Insufficient data points (need at least 2) to calculate time in zones.")
-		return time_spent_in_zones  # No durations to calculate
+		return time_spent_in_zones
 
 	for i in range(len(time_data) - 1):
 		hr_value = heartrate_data[i]
