@@ -90,3 +90,4 @@ data/coverage.xml
 cert.crt
 cert.key
 *.pem
+aws/
