@@ -102,8 +102,8 @@ This file outlines the development steps and serves as a checklist to track prog
 ## Phase 6: Production-Level Deployment (AWS Free Tier)
 
 - [ ] **Infrastructure Setup (AWS Free Tier)**
-  - [ ] Define infrastructure requirements (e.g., EC2 for backend, S3 for frontend static assets, RDS for database if needed, or SQLite on EC2).
-  - [ ] Set up IAM roles and permissions.
+  - [x] Define infrastructure requirements (e.g., EC2 for backend, S3 for frontend static assets, RDS for database if needed, or SQLite on EC2).
+  - [x] Set up IAM roles and permissions.
   - [ ] Configure VPC, subnets, security groups.
   - [ ] Choose an appropriate EC2 instance type (t2.micro or t3.micro typically in free tier).
   - [ ] Set up RDS if chosen, or configure SQLite on the EC2 instance.
