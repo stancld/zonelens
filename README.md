@@ -10,6 +10,8 @@
     <img src="https://codecov.io/github/stancld/strava-zones/graph/badge.svg?token=LNOJHFDBUA" alt="Code Coverage"/>
   </a>
   <img src="https://img.shields.io/badge/python-3.12-blue" alt="Python 3.12"/>
+  <img src="https://img.shields.io/badge/Backend-v0.1.0-blue" alt="Backend Version v0.1.0"/>
+  <img src="https://img.shields.io/badge/Frontend-n/a-orange" alt="Frontend Version not relesed yet/>
   <a href="LICENSE">
     <img src="https://img.shields.io/badge/license-MIT-green" alt="License: MIT"/>
   </a>
@@ -43,8 +45,8 @@ Strava HR Zone Calendar Visualization enhances your Strava experience by integra
 
 ## 🛠️ Technology Stack
 
-*   **Backend:** Python, Django, Django REST Framework, Gunicorn
-*   **Frontend (Extension):** JavaScript, HTML, CSS
+*   **Backend:** Python, Django, Django REST Framework, Gunicorn (Version: v0.1.0)
+*   **Frontend (Extension):** JavaScript, HTML, CSS (Version: N/A)
 *   **Database:** PostgreSQL
 *   **Containerization:** Docker
 *   **CI/CD:** GitHub Actions
