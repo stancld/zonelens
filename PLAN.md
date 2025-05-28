@@ -110,14 +110,14 @@ This file outlines the development steps and serves as a checklist to track prog
   - [ ] Configure S3 bucket for static frontend hosting (if applicable).
   - [ ] Set up CloudFront CDN for frontend (optional, but good practice).
 
-- [ ] **Backend Deployment (Django)**
+- [x] **Backend Deployment (Django)**
   - [x] Containerize the Django application (Docker).
-  - [ ] Set up a process manager (e.g., Gunicorn, Supervisor) on EC2.
-  - [ ] Configure a web server (e.g., Nginx) as a reverse proxy on EC2.
-  - [ ] Manage static files (collectstatic) and media files.
+  - [x] Set up a process manager (e.g., Gunicorn, Supervisor) on EC2.
+  - [x] Configure a web server (e.g., Nginx) as a reverse proxy on EC2.
+  - [x] Manage static files (collectstatic) and media files.
   - [ ] Configure environment variables securely (e.g., AWS Systems Manager Parameter Store, or .env file with restricted permissions).
-  - [ ] Set up logging and monitoring (e.g., CloudWatch Logs).
-  - [ ] Database migrations.
+  - [x] Set up logging and monitoring (e.g., CloudWatch Logs).
+  - [x] Database migrations.
 
 - [ ] **Frontend Deployment (Static)**
   - [ ] Build frontend assets.
@@ -140,3 +140,29 @@ This file outlines the development steps and serves as a checklist to track prog
 - [ ] **Monitoring and Maintenance Plan**
   - [ ] Define basic monitoring alerts (e.g., server down, high error rates).
   - [ ] Plan for regular updates and security patching.
+
+server {
+    listen 80;
+    server_name YOUR_EC2_PUBLIC_IP; # Replace with your EC2's public IP, or your domain later
+
+    # Location for static files
+    location /static/ {
+        alias /var/www/strava-zones/staticfiles/; # Path on the EC2 host
+        expires 30d; # Cache static files for 30 days
+        add_header Cache-Control "public";
+    }
+
+    # Location for media files (if you have them)
+    # location /media/ {
+    #     alias /var/www/strava-zones/media/; # Path on the EC2 host
+    # }
+
+    # Proxy pass to Gunicorn
+    location / {
+        proxy_pass http://127.0.0.1:8001; # Gunicorn listening on host's port 8001
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
