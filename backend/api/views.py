@@ -21,6 +21,7 @@ from django.http import (
 	HttpResponseRedirect,
 )
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 from django.utils import timezone
 from django.views.generic import TemplateView, View
 from rest_framework import generics, status
@@ -62,7 +63,8 @@ def strava_authorize(request: HttpRequest) -> HttpResponseRedirect:
 	"""Redirects the user to Strava's authorization page."""
 	scopes = "read,activity:read_all,profile:read_all"
 	client_id = settings.STRAVA_CLIENT_ID
-	redirect_uri = f"{request.scheme}://localhost:8000/api/auth/strava/callback"
+	callback_path = reverse("strava_callback")
+	redirect_uri = request.build_absolute_uri(callback_path)
 
 	params = {
 		"client_id": client_id,
@@ -866,7 +868,8 @@ class StravaAuthorizeView(LoginRequiredMixin, View):
 	def get(self, request: HttpRequest) -> HttpResponseRedirect:
 		scopes = "read,activity:read_all,profile:read_all"
 		client_id = settings.STRAVA_CLIENT_ID
-		redirect_uri = f"{request.scheme}://localhost:8000/api/auth/strava/callback"
+		callback_path = reverse("strava_callback")
+		redirect_uri = request.build_absolute_uri(callback_path)
 
 		params = {
 			"client_id": client_id,

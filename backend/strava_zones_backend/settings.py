@@ -183,10 +183,20 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 CSRF_COOKIE_SAMESITE = "None"
 CSRF_COOKIE_SECURE = True
+
+if EC2_PUBLIC_HOSTNAME := os.getenv("EC2_PUBLIC_HOSTNAME"):
+	CORS_PRODUCTION_ORIGINS = [
+		f"https://{EC2_PUBLIC_HOSTNAME}",
+		f"http://{EC2_PUBLIC_HOSTNAME}",  # Often needed for initial HTTP access
+	]
+else:
+	CORS_PRODUCTION_ORIGINS = []
+
 CSRF_TRUSTED_ORIGINS = [
 	"https://localhost:8000",
 	"https://127.0.0.1:8000",
 	f"chrome-extension://{os.getenv('CHROME_EXTENSION_ID')}",  # hard-coded for local development
+	*CORS_PRODUCTION_ORIGINS,
 ]
 
 # Custom Settings for REST Framework
