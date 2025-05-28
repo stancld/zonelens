@@ -124,45 +124,7 @@ This file outlines the development steps and serves as a checklist to track prog
   - [ ] Deploy to S3 (if S3 hosting chosen).
   - [ ] Configure CloudFront to serve from S3 (if chosen).
 
-- [ ] **Domain and HTTPS**
-  - [ ] Register or use an existing domain name.
-  - [ ] Configure DNS records (e.g., Route 53).
-  - [ ] Set up HTTPS using AWS Certificate Manager (ACM) with Load Balancer or CloudFront.
-
-- [ ] **CI/CD (Optional for initial deployment, but recommended)**
-  - [ ] Set up a basic CI/CD pipeline (e.g., GitHub Actions, AWS CodePipeline) for automated deployments.
-
-- [ ] **Testing and Validation**
-  - [ ] Thoroughly test the deployed application in the production-like environment.
-  - [ ] Check all functionalities, including authentication, data fetching, and display.
-  - [ ] Perform basic security checks.
-
-- [ ] **Monitoring and Maintenance Plan**
-  - [ ] Define basic monitoring alerts (e.g., server down, high error rates).
-  - [ ] Plan for regular updates and security patching.
-
-server {
-    listen 80;
-    server_name YOUR_EC2_PUBLIC_IP; # Replace with your EC2's public IP, or your domain later
-
-    # Location for static files
-    location /static/ {
-        alias /var/www/strava-zones/staticfiles/; # Path on the EC2 host
-        expires 30d; # Cache static files for 30 days
-        add_header Cache-Control "public";
-    }
-
-    # Location for media files (if you have them)
-    # location /media/ {
-    #     alias /var/www/strava-zones/media/; # Path on the EC2 host
-    # }
-
-    # Proxy pass to Gunicorn
-    location / {
-        proxy_pass http://127.0.0.1:8001; # Gunicorn listening on host's port 8001
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-    }
-}
+- [x] **Domain and HTTPS**
+  - [x] Register or use an existing domain name.
+  - [x] Configure DNS records (e.g., Route 53).
+  - [x] Set up HTTPS using AWS Certificate Manager (ACM)
