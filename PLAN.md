@@ -101,14 +101,13 @@ This file outlines the development steps and serves as a checklist to track prog
 
 ## Phase 6: Production-Level Deployment (AWS Free Tier)
 
-- [ ] **Infrastructure Setup (AWS Free Tier)**
+- [x] **Infrastructure Setup (AWS Free Tier)**
   - [x] Define infrastructure requirements (e.g., EC2 for backend, S3 for frontend static assets, RDS for database if needed, or SQLite on EC2).
   - [x] Set up IAM roles and permissions.
   - [x] Configure VPC, subnets, security groups.
   - [x] Choose an appropriate EC2 instance type (t2.micro or t3.micro typically in free tier).
   - [x] Set up RDS if chosen with PostgreSQL.
   - [ ] Configure S3 bucket for static frontend hosting (if applicable).
-  - [ ] Set up CloudFront CDN for frontend (optional, but good practice).
 
 - [x] **Backend Deployment (Django)**
   - [x] Containerize the Django application (Docker).

@@ -2,34 +2,128 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Strava Zones - Test Frontend</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Strava Zones - Login</title>
     <style>
-        body { font-family: sans-serif; padding: 20px; }
-        #profile, #error { margin-top: 20px; padding: 15px; border: 1px solid #ccc; border-radius: 5px; }
-        #profile { background-color: #e9f5e9; border-color: #a3cfa3; }
-        #error { background-color: #f8d7da; border-color: #f5c6cb; color: #721c24; }
-        button { padding: 10px 15px; font-size: 1em; cursor: pointer; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: #f7f7f7;
+            color: #333;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            text-align: center;
+        }
+        .container {
+            background-color: #fff;
+            padding: 30px 40px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            max-width: 400px;
+            width: 90%;
+        }
+        h1 {
+            color: #FC4C02; /* Strava Orange */
+            margin-bottom: 15px;
+            font-size: 2em;
+        }
+        p {
+            font-size: 1.1em;
+            line-height: 1.6;
+            margin-bottom: 25px;
+        }
+        .strava-button {
+            background-color: #FC4C02; /* Strava Orange */
+            color: white;
+            border: none;
+            padding: 12px 25px;
+            font-size: 1.1em;
+            font-weight: bold;
+            border-radius: 5px;
+            cursor: pointer;
+            text-decoration: none;
+            transition: background-color 0.3s ease;
+        }
+        .strava-button:hover {
+            background-color: #e04402;
+        }
+        #profile, #error {
+            margin-top: 25px;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            text-align: left;
+        }
+        #profile {
+            background-color: #f0fff0;
+            border-color: #c0e0c0;
+        }
+        #error {
+            background-color: #fff0f0;
+            border-color: #e0c0c0;
+            color: #d00;
+        }
+        #profile h2, #error h2 {
+            margin-top: 0;
+            color: #333;
+            font-size: 1.5em;
+        }
+        pre {
+            background-color: #f9f9f9;
+            padding: 15px;
+            border-radius: 4px;
+            border: 1px solid #eee;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            font-size: 0.9em;
+        }
+        .logout-button {
+            background-color: #777;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            font-size: 1em;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-top: 15px;
+            transition: background-color 0.3s ease;
+        }
+        .logout-button:hover {
+            background-color: #555;
+        }
+        .author-credit {
+            font-size: 0.8em;
+            color: #777;
+            margin-top: 30px;
+            text-align: center;
+        }
     </style>
 </head>
 <body>
+    <div class="container">
+        <h1>Welcome to Strava Zones!</h1>
+        <div id="auth-section">
+            <p>Customize your Strava activity heart rate and power zones with ease. Connect your Strava account to get started.</p>
+            <button class="strava-button" onclick="window.location.href='/api/auth/strava'">Login with Strava</button>
+        </div>
 
-    <h1>Strava Zones - Test Frontend</h1>
+        <div id="profile" style="display: none;">
+            <h2>Authenticated Profile</h2>
+            <pre id="profile-data"></pre>
+            <button class="logout-button" onclick="logout()">Logout</button>
+        </div>
 
-    <div id="auth-section">
-        <p>Click the button below to authenticate with Strava.</p>
-        <button onclick="window.location.href='/api/auth/strava'">Login with Strava</button>
+        <div id="error" style="display: none;">
+            <h2>Error</h2>
+            <p id="error-message"></p>
+        </div>
     </div>
 
-    <div id="profile" style="display: none;">
-        <h2>Authenticated Profile</h2>
-        <pre id="profile-data"></pre>
-        <button onclick="logout()">Logout</button>
-    </div>
-
-    <div id="error" style="display: none;">
-        <h2>Error</h2>
-        <p id="error-message"></p>
-    </div>
+    <p class="author-credit">Authored by stancld</p>
 
     <script>
         const authSection = document.getElementById('auth-section');
