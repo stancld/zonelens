@@ -42,8 +42,8 @@ Strava HR Zone Calendar Visualization enhances your Strava experience by integra
 ## 📸 Screenshots
 
 <p align="center">
-  <img src="images/wip_calendar_250516.png" alt="Calendar Visualization Screenshot" width="400" style="vertical-align:middle"/>
-  <img src="images/wip_hr_config_250523.png" alt="HR Configuration Screenshot" width="400" style="vertical-align:middle"/>
+  <img src="images/calendar.png" alt="Calendar Visualization Screenshot" width="400" style="vertical-align:middle"/>
+  <img src="images/hr_config.png" alt="HR Configuration Screenshot" width="400" style="vertical-align:middle"/>
 </p>
 
 ## 🛠️ Technology Stack
