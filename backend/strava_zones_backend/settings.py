@@ -198,6 +198,7 @@ else:
 CSRF_TRUSTED_ORIGINS = [
 	"https://localhost:8000",
 	"https://127.0.0.1:8000",
+	"https://strava-zones.com",  # Primary production domain
 	f"chrome-extension://{os.getenv('CHROME_EXTENSION_ID')}",  # hard-coded for local development
 	*CORS_PRODUCTION_ORIGINS,
 ]
