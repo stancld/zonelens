@@ -44,7 +44,13 @@ document.addEventListener('DOMContentLoaded', function() {
     const afterDateInput = document.getElementById('afterDate');
     const statusMessage = document.getElementById('statusMessage');
 
-    const API_BASE_URL = 'https://localhost:8000/api'; // Ensure this matches your backend
+    // Configuration for API endpoints
+    const PRODUCTION_DOMAIN = 'https://strava-zones.com';
+    const DEVELOPMENT_DOMAIN = 'https://localhost:8000';
+    const IS_PRODUCTION_BUILD = false; // Set to true for production builds
+
+    const BACKEND_ORIGIN = IS_PRODUCTION_BUILD ? PRODUCTION_DOMAIN : DEVELOPMENT_DOMAIN;
+    const API_BASE_URL = `${BACKEND_ORIGIN}/api`;
 
     // Function to update status message and apply class (moved to higher scope)
     function updateStatus(message, type) {

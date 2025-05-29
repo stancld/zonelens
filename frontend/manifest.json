@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Strava HR Zones Display",
-  "version": "0.1.0",
+  "version": "0.1.4",
   "description": "Displays custom heart rate zone summaries on the Strava calendar.",
   "permissions": [
     "activeTab",
@@ -11,7 +11,8 @@
   ],
   "host_permissions": [
     "*://*.strava.com/*",
-    "https://localhost:8000/*"
+    "https://localhost:8000/*",
+    "https://strava-zones.com/*"
   ],
   "content_scripts": [
     {

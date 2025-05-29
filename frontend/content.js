@@ -6,7 +6,13 @@ const WEEKLY_SUMMARY_CLASS = 'injected-weekly-hr-summary'; // Class for easy rem
 
 // Placeholder for User ID - replace with actual user ID retrieval logic
 // const USER_ID = 1; // No longer sending hardcoded user_id for this view
-const API_BASE_URL = 'https://localhost:8000/api';
+// Configuration for API endpoints
+const PRODUCTION_DOMAIN = 'https://strava-zones.com';
+const DEVELOPMENT_DOMAIN = 'https://localhost:8000';
+const IS_PRODUCTION_BUILD = false; // Set to true for production builds
+
+const BACKEND_ORIGIN = IS_PRODUCTION_BUILD ? PRODUCTION_DOMAIN : DEVELOPMENT_DOMAIN;
+const API_BASE_URL = `${BACKEND_ORIGIN}/api`;
 
 // Month name map for API consistency if needed (Strava hash vs API expectation)
 const monthMap = {
