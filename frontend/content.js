@@ -9,7 +9,7 @@ const WEEKLY_SUMMARY_CLASS = 'injected-weekly-hr-summary'; // Class for easy rem
 // Configuration for API endpoints
 const PRODUCTION_DOMAIN = 'https://strava-zones.com';
 const DEVELOPMENT_DOMAIN = 'https://localhost:8000';
-const IS_PRODUCTION_BUILD = false; // Set to true for production builds
+const IS_PRODUCTION_BUILD = true; // Set to true for production builds
 
 const BACKEND_ORIGIN = IS_PRODUCTION_BUILD ? PRODUCTION_DOMAIN : DEVELOPMENT_DOMAIN;
 const API_BASE_URL = `${BACKEND_ORIGIN}/api`;
