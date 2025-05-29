@@ -1,0 +1,56 @@
+name: Frontend Release Build and Package
+
+on:
+  push:
+    branches:
+      - 'frontend/releases'
+    tags:
+      - 'frontend-v*.*.*'
+
+jobs:
+  build_and_package_frontend:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # Needed for softprops/action-gh-release to create/update releases
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Get Version from Tag
+        id: get_version
+        if: startsWith(github.ref, 'refs/tags/frontend-v')
+        run: echo "VERSION_TAG=${GITHUB_REF#refs/tags/frontend-v}" >> $GITHUB_ENV
+
+      - name: Determine Zip File Name
+        id: zip_details
+        run: |
+          if [[ "${{ github.ref }}" == refs/tags/frontend-v* ]]; then
+            echo "ZIP_NAME=strava_zones_extension_${{ env.VERSION_TAG }}.zip" >> $GITHUB_ENV
+          else
+            echo "ZIP_NAME=strava_zones_extension_branch_build.zip" >> $GITHUB_ENV
+          fi
+        shell: bash
+
+      - name: Zip frontend directory
+        run: |
+          echo "Zipping contents of frontend directory into ${{ env.ZIP_NAME }}"
+          cd frontend
+          zip -r ../${{ env.ZIP_NAME }} .
+          echo "Created zip file: ../${{ env.ZIP_NAME }}"
+        shell: bash
+
+      - name: Upload Artifact for branch push
+        if: startsWith(github.ref, 'refs/heads/frontend/releases')
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.ZIP_NAME }}
+          path: ${{ env.ZIP_NAME }}
+
+      - name: Create or Update Release and Upload Asset (for tags)
+        if: startsWith(github.ref, 'refs/tags/frontend-v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ env.ZIP_NAME }}
+          tag_name: ${{ github.ref_name }} # This is the tag that triggered the workflow
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
