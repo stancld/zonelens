@@ -70,9 +70,9 @@ document.addEventListener('DOMContentLoaded', function() {
     // --- HR Zones Check ---
     async function checkHrZonesAvailability() {
         console.log('Checking HR zone availability from backend...');
-        const backendOrigin = 'https://localhost:8000'; // Define base origin
+        // Use the dynamic BACKEND_ORIGIN for cookie retrieval
         try {
-            const csrftoken = await getCookie('csrftoken', backendOrigin);
+            const csrftoken = await getCookie('csrftoken', BACKEND_ORIGIN);
             if (!csrftoken) {
                 console.error('CSRF token not found for HR zone check.');
                 updateStatus('Error: CSRF token not found. Please log in to the backend.', 'error');
@@ -121,9 +121,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
     async function fetchAndStoreStravaHrZones() {
         updateStatus('Attempting to fetch HR zones from Strava...', 'info');
-        const backendOrigin = 'https://localhost:8000';
         try {
-            const csrftoken = await getCookie('csrftoken', backendOrigin);
+            const csrftoken = await getCookie('csrftoken', BACKEND_ORIGIN);
             if (!csrftoken) {
                 updateStatus('Error: CSRF token not found. Please log in.', 'error');
                 return false;
@@ -156,7 +155,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     if (viewMyHrZonesButton) {
         viewMyHrZonesButton.addEventListener('click', function() {
-            chrome.tabs.create({ url: 'https://localhost:8000/api/user/hr-zones/' });
+            chrome.tabs.create({ url: `${API_BASE_URL}/user/hr-zones/` });
         });
     }
 
@@ -175,8 +174,8 @@ document.addEventListener('DOMContentLoaded', function() {
             updateStatus('Syncing data from Strava...', 'info');
 
             try {
-                const backendOrigin = 'https://localhost:8000'; // Define base origin
-                const csrftoken = await getCookie('csrftoken', backendOrigin); // Await the async call
+                // Use dynamic BACKEND_ORIGIN for cookie retrieval
+                const csrftoken = await getCookie('csrftoken', BACKEND_ORIGIN); // Await the async call
 
                 if (!csrftoken) {
                     updateStatus('Error: CSRF token not found. Ensure you are logged in to the backend and cookie settings are correct.', 'error');
