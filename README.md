@@ -13,7 +13,7 @@
     <img src="https://codecov.io/github/stancld/strava-zones/graph/badge.svg?token=LNOJHFDBUA" alt="Code Coverage"/>
   </a>
   <img src="https://img.shields.io/badge/python-3.12-blue" alt="Python 3.12"/>
-  <img src="https://img.shields.io/badge/Backend-v0.1.3-blue" alt="Backend Version v0.1.3"/>
+  <img src="https://img.shields.io/badge/Backend-v0.1.4-blue" alt="Backend Version v0.1.4"/>
   <img src="https://img.shields.io/badge/Frontend-n/a-orange" alt="Frontend Version not released yet"/>
   <a href="LICENSE">
     <img src="https://img.shields.io/badge/license-MIT-green" alt="License: MIT"/>
