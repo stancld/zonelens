@@ -5,7 +5,7 @@ on:
     branches:
       - 'frontend/releases'
     tags:
-      - 'frontend-v*.*.*'
+      - 'strava-zones-v*.*.*'
 
 jobs:
   build_and_package_frontend:
@@ -18,18 +18,12 @@ jobs:
 
       - name: Get Version from Tag
         id: get_version
-        if: startsWith(github.ref, 'refs/tags/frontend-v')
-        run: echo "VERSION_TAG=${GITHUB_REF#refs/tags/frontend-v}" >> $GITHUB_ENV
+        if: startsWith(github.ref, 'refs/tags/strava-zones-v')
+        run: echo "VERSION_TAG=${GITHUB_REF#refs/tags/strava-zones-v}" >> $GITHUB_ENV
 
       - name: Determine Zip File Name
         id: zip_details
-        run: |
-          if [[ "${{ github.ref }}" == refs/tags/frontend-v* ]]; then
-            echo "ZIP_NAME=strava_zones_extension_${{ env.VERSION_TAG }}.zip" >> $GITHUB_ENV
-          else
-            echo "ZIP_NAME=strava_zones_extension_branch_build.zip" >> $GITHUB_ENV
-          fi
-        shell: bash
+        run: echo "ZIP_NAME=strava-zones-v${{ env.VERSION_TAG }}.zip" >> $GITHUB_ENV
 
       - name: Zip frontend directory
         run: |
@@ -47,7 +41,7 @@ jobs:
           path: ${{ env.ZIP_NAME }}
 
       - name: Create or Update Release and Upload Asset (for tags)
-        if: startsWith(github.ref, 'refs/tags/frontend-v')
+        if: startsWith(github.ref, 'refs/tags/strava-zones-v')
         uses: softprops/action-gh-release@v2
         with:
           files: ${{ env.ZIP_NAME }}
