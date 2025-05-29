@@ -91,3 +91,4 @@ cert.crt
 cert.key
 *.pem
 aws/
+data/IconKitchen-Output/

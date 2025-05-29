@@ -1,8 +1,11 @@
-# Strava HR Zone Calendar Visualization
+# Strava Zones - Zone Calendar Visualization
 
 <div align="center">
-
-  <!-- Badges -->
+  <img src="frontend/images/icon512.png" alt="Strava Zones Logo" width="128"/>
+  <br/>
+  <br/>
+  <p>
+    <!-- Badges -->
   <a href="https://github.com/stancld/strava-zones/actions/workflows/backend-release-build.yml">
     <img src="https://github.com/stancld/strava-zones/actions/workflows/backend-release-build.yml/badge.svg" alt="Backend CI Status"/>
   </a>
@@ -11,10 +14,11 @@
   </a>
   <img src="https://img.shields.io/badge/python-3.12-blue" alt="Python 3.12"/>
   <img src="https://img.shields.io/badge/Backend-v0.1.3-blue" alt="Backend Version v0.1.3"/>
-  <img src="https://img.shields.io/badge/Frontend-n/a-orange" alt="Frontend Version not relesed yet/>
+  <img src="https://img.shields.io/badge/Frontend-n/a-orange" alt="Frontend Version not released yet"/>
   <a href="LICENSE">
     <img src="https://img.shields.io/badge/license-MIT-green" alt="License: MIT"/>
   </a>
+  </p>
 
 </div>
 
@@ -115,4 +119,4 @@ This project uses Docker for easier setup and consistent environments.
 
 ## 📜 License
 
-This project is licensed under the MIT License - see the [LICENSE.md](LICENSE.md) file for details.
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
