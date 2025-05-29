@@ -1,7 +1,9 @@
-# Strava Zones - Zone Calendar Visualization
+# Strava Zones - Enhanced Training Calendar
 
 <div align="center">
-  <img src="frontend/images/icon512.png" alt="Strava Zones Logo" width="128"/>
+  <a href="https://strava-zones.com" target="_blank">
+    <img src="frontend/images/icon512.png" alt="Strava Zones Logo" width="128"/>
+  </a>
   <br/>
   <br/>
   <p>
@@ -21,23 +23,30 @@
 
 </div>
 
+**Strava Zones** enhances your Strava experience by visualizing your Heart Rate (HR) zone data directly on your Training Calendar. Understand your training intensity at a glance and optimize your efforts!
+
+Visit our website: [strava-zones.com](https://strava-zones.com)
+
+> [!IMPORTANT]
+> **Chrome Web Store Status:** Our extension is currently **pending review** for publication on the Chrome Web Store. We'll update this space as soon as it's live! In the meantime, you can install it manually (see instructions below for developers, which can be adapted for users).
+
 > [!NOTE]
 > **Disclaimer:** This application is a personal project and is **not affiliated with, endorsed by, or in any way officially connected with Strava, Inc.** All Strava trademarks and logos are the property of Strava, Inc.
 
-> [!NOTE]
-> **Vibe-Coded Project:** This project is developed with a "vibe-coding" approach, focusing on learning, exploration, and rapid iteration. Some aspects may reflect this experimental nature rather than production-optimized design.
+## ✨ Overview
 
-## Overview
+Strava Zones is a tool designed for athletes who want deeper insights into their training. It consists of a **Chrome Extension** that modifies your Strava Training Calendar page and a **Django backend** that securely processes your activity data via the Strava API.
 
-Strava HR Zone Calendar Visualization enhances your Strava experience by integrating detailed Heart Rate (HR) zone data directly into your Training Calendar. This tool, comprising a Chrome Extension and a Django backend, fetches your activity data via the Strava API, processes HR information, and visualizes your time spent in different HR zones on a weekly and monthly basis.
+By fetching your activities and their detailed heart rate streams, Strava Zones calculates the time you've spent in each heart rate zone and displays this information clearly on your calendar, helping you track your training load and recovery effectively.
 
 ## 🌟 Key Features
 
 *   **Strava Integration:** Secure OAuth2 authentication to access your Strava data.
 *   **HR Zone Visualization:** Displays aggregated time-in-zone directly on the Strava Training Calendar page.
 *   **Custom HR Zones:** Define your own HR zone boundaries or use Strava's defaults.
-*   **Data Synchronization:** Fetches recent activities and processes HR data streams.
-*   **Backend API:** Robust Django backend serving data to the Chrome extension.
+*   **Data Synchronization:** Fetches recent activities and processes HR data streams automatically.
+*   **User-Friendly Interface:** Easy-to-understand visuals integrated into your existing Strava workflow.
+*   **Secure Backend API:** Robust Django backend serving data to the Chrome extension, ensuring your data is handled safely.
 
 ## 📸 Screenshots
 
@@ -46,18 +55,28 @@ Strava HR Zone Calendar Visualization enhances your Strava experience by integra
   <img src="images/hr_config.png" alt="HR Configuration Screenshot" width="400" style="vertical-align:middle"/>
 </p>
 
+## 🧑‍💻 For Users: Getting Started with Strava Zones
+
+Once the extension is available on the Chrome Web Store:
+
+1.  **Install the Extension:** Search for "Strava Zones" on the Chrome Web Store and click "Add to Chrome".
+2.  **Connect to Strava:** Open the extension (usually from your browser's toolbar) and follow the prompts to authorize it with your Strava account.
+3.  **View Your Zones:** Navigate to your Strava Training Calendar. The extension will automatically enhance the calendar with your heart rate zone data!
+
+*(Manual installation instructions are currently part of the developer setup below. Users comfortable with these steps can also follow them.)*
+
 ## 🛠️ Technology Stack
 
-*   **Backend:** Python, Django, Django REST Framework, Gunicorn (Version: v0.1.0)
-*   **Frontend (Extension):** JavaScript, HTML, CSS (Version: N/A)
+*   **Backend:** Python, Django, Django REST Framework, Gunicorn
+*   **Frontend (Extension):** JavaScript, HTML, CSS
 *   **Database:** PostgreSQL
-*   **Containerization:** Docker
+*   **Containerization:** Docker, Docker Compose
 *   **CI/CD:** GitHub Actions
 *   **External API:** Strava API (v3)
 
-## 🚀 Getting Started
+## 🚀 For Developers: Getting Started
 
-This project uses Docker for easier setup and consistent environments.
+This project uses Docker for easier setup and consistent development environments.
 
 ### Prerequisites
 
@@ -85,19 +104,19 @@ This project uses Docker for easier setup and consistent environments.
         docker-compose up --build -d
         ```
     *   This command will build the Docker images for the backend and database, and start the services in detached mode.
-    *   To view logs: `docker-compose logs -f strava-backend`
+    *   To view logs: `docker-compose logs -f strava-backend` (or `docker compose logs -f strava-backend` for newer Docker Compose versions).
 
-4.  **Load the Chrome Extension:**
+4.  **Load the Chrome Extension (Manual Installation):**
     *   Open Chrome and navigate to `chrome://extensions`.
     *   Enable "Developer mode" (usually a toggle in the top right).
     *   Click "Load unpacked".
     *   Select the `frontend/extension` directory from this project.
-    *   Ensure the extension ID in `chrome://extensions` matches the `CHROME_EXTENSION_ID` in your backend's `.env` file if you've set `CSRF_TRUSTED_ORIGINS` to use it.
+    *   Ensure the extension ID in `chrome://extensions` matches the `CHROME_EXTENSION_ID` in your backend's `.env` file if you've set `CSRF_TRUSTED_ORIGINS` to use it for stricter security during development.
 
-6.  **Access the Application:**
+5.  **Access the Application:**
     *   The backend API should now be available at `http://localhost:8000`.
     *   Navigate to your Strava Training Calendar. The extension should activate and attempt to fetch data.
-    *   You may need to authenticate via the extension popup or by visiting an API endpoint like `/api/profile/` which will redirect to Strava login.
+    *   You may need to authenticate via the extension popup or by visiting an API endpoint like `/api/profile/` which will redirect to Strava login if you're not already authenticated.
 
 ## ⚙️ API Endpoints Overview
 
@@ -107,14 +126,14 @@ This project uses Docker for easier setup and consistent environments.
     *   `GET /api/profile/`: User profile (requires auth).
 *   **Data Sync:**
     *   `POST /api/strava/sync-activities/`: Triggers activity sync (requires auth).
-*   **HR Zones:**
+*   **HR Zones Configuration:**
     *   `GET, POST /api/settings/custom-zones/`: List or create custom HR zones.
     *   `GET, PUT, DELETE /api/settings/custom-zones/<uuid:pk>/`: Manage specific HR zone config.
     *   `POST /api/fetch-strava-hr-zones/`: Fetch and store HR zones from Strava.
     *   `GET /api/user/hr-zones/`: HTML page for HR zone management.
     *   `GET /api/user/hr-zone-status/`: Status of user's HR zone config.
 *   **Aggregated Data for Extension:**
-    *   `GET /api/zones/`: Provides aggregated zone data (e.g., time in zones per week/month).
+    *   `GET /api/zones/`: Provides aggregated zone data (e.g., time in zones per week/month for the calendar).
 
 ## 📜 License
 
