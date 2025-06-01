@@ -43,7 +43,7 @@ from api.strava_client import (
 )
 from api.utils import decrypt_data, encrypt_data
 from api.views import UserHRZonesDisplayView
-from api.worker import StravaHRWorker
+from api.worker import Worker
 
 if TYPE_CHECKING:
 	from django.http import HttpRequest, HttpResponse
@@ -953,7 +953,7 @@ class StravaHRWorkerTests(TestCase):
 		CustomZonesConfig.objects.filter(
 			user=self.strava_user, activity_type=ActivityType.DEFAULT
 		).delete()
-		worker = StravaHRWorker(user_strava_id=self.strava_user.strava_id)
+		worker = Worker(user_strava_id=self.strava_user.strava_id)
 		with self.assertRaisesRegex(
 			ValueError, f"Default zones config not found for user {self.strava_user.strava_id}."
 		):
@@ -1032,7 +1032,7 @@ class StravaHRWorkerTests(TestCase):
 			else {}
 		)
 
-		worker = StravaHRWorker(user_strava_id=self.strava_user.strava_id)
+		worker = Worker(user_strava_id=self.strava_user.strava_id)
 		with self.assertLogs(worker.logger, level="INFO") as cm:
 			worker.process_user_activities()
 
@@ -1081,7 +1081,7 @@ class StravaHRWorkerTests(TestCase):
 		mock_client_instance = MockStravaApiClient.return_value
 		mock_client_instance.fetch_strava_activities.return_value = []  # No activities
 
-		worker = StravaHRWorker(user_strava_id=self.strava_user.strava_id)
+		worker = Worker(user_strava_id=self.strava_user.strava_id)
 		worker.process_user_activities()
 		self.assertEqual(ActivityZoneTimes.objects.count(), 0)
 
@@ -1094,7 +1094,7 @@ class StravaHRWorkerTests(TestCase):
 		mock_client_instance = MockStravaApiClient.return_value
 		mock_client_instance.fetch_strava_activities.side_effect = ValueError("API fetch error")
 
-		worker = StravaHRWorker(user_strava_id=self.strava_user.strava_id)
+		worker = Worker(user_strava_id=self.strava_user.strava_id)
 		with self.assertRaisesRegex(
 			ValueError, f"Failed to fetch activities for user {self.strava_user.strava_id}"
 		):
@@ -1117,7 +1117,7 @@ class StravaHRWorkerTests(TestCase):
 		]
 		mock_client_instance.fetch_activity_streams.side_effect = ValueError("Stream fetch error")
 
-		worker = StravaHRWorker(user_strava_id=self.strava_user.strava_id)
+		worker = Worker(user_strava_id=self.strava_user.strava_id)
 		with self.assertLogs(worker.logger, level="ERROR") as cm:
 			worker.process_user_activities()
 
@@ -1131,7 +1131,7 @@ class StravaHRWorkerTests(TestCase):
 		)  # No zones should be saved if streams fail
 
 	def test__get_all_user_zone_configs(self) -> None:  # noqa: PLR0915
-		worker = StravaHRWorker(user_strava_id=self.strava_user.strava_id)
+		worker = Worker(user_strava_id=self.strava_user.strava_id)
 
 		# 1. No configurations exist
 		CustomZonesConfig.objects.filter(user=self.strava_user).delete()

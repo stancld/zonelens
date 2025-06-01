@@ -34,7 +34,7 @@ from rest_framework.views import APIView
 from api.models import ActivityType, CustomZonesConfig, HeartRateZone, StravaUser, ZoneSummary
 from api.serializers import CustomZonesConfigSerializer, ZoneSummarySerializer
 from api.utils import encrypt_data
-from api.worker import StravaHRWorker
+from api.worker import Worker
 
 if TYPE_CHECKING:
 	from typing import Any, TypedDict
@@ -256,7 +256,7 @@ class ProcessActivitiesView(APIView):
 				)
 
 		try:
-			worker = StravaHRWorker(user_strava_id=user_strava_id)
+			worker = Worker(user_strava_id=user_strava_id)
 			worker.process_user_activities(after_timestamp=after_timestamp_unix)
 			return Response(
 				{"message": f"Successfully processed activities for user {user_strava_id}"},
@@ -407,7 +407,7 @@ class FetchStravaHRZonesView(APIView):
 			)
 
 		try:
-			worker = StravaHRWorker(user_strava_id=user_strava_profile.strava_id)
+			worker = Worker(user_strava_id=user_strava_profile.strava_id)
 			if _success := worker.fetch_and_store_strava_hr_zones():
 				# The worker logs specifics. Here, just confirm the operation.
 				return Response(

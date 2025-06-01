@@ -28,7 +28,7 @@ DEFAULT_ZONES_NAMES_MAPPING = {
 }
 
 
-class StravaHRWorker:
+class Worker:
 	"""Fetch activities for a user, process heart rate data and store time-in-zone information."""
 
 	def __init__(self, user_strava_id: int):
@@ -39,97 +39,6 @@ class StravaHRWorker:
 
 		self.strava_client = StravaApiClient(self.user)
 		self.logger = get_logger(__name__)
-
-	def _get_default_zones_config(self) -> CustomZonesConfig | None:
-		try:
-			config = CustomZonesConfig.objects.get(
-				user=self.user, activity_type=ActivityType.DEFAULT
-			)
-			if not config.zones_definition.exists():
-				self.logger.warning(
-					f"Default CustomZonesConfig {config.id} for user {self.user.strava_id} "
-					"has no zone definitions. Will treat all time as 'outside zones'."
-				)
-				# We can still proceed, calculate_time_in_zones will handle this
-			return config
-		except CustomZonesConfig.DoesNotExist:
-			self.logger.warning(
-				f"No default CustomZonesConfig found for user {self.user.strava_id}. "
-				"Cannot process HR data without zone definitions."
-			)
-			return None
-		except CustomZonesConfig.MultipleObjectsReturned:
-			self.logger.warning(
-				f"Multiple default CustomZonesConfigs found for user {self.user.strava_id}. "
-				"Using the first one. Please ensure only one default config per user."
-			)
-			config = CustomZonesConfig.objects.filter(
-				user=self.user, activity_type=ActivityType.DEFAULT
-			).first()
-			if config and not config.zones_definition.exists():
-				self.logger.warning(
-					f"Selected CustomZonesConfig {config.id} for user {self.user.strava_id} "
-					"has no zone definitions."
-				)
-			return config
-
-	def _get_all_user_zone_configs(self) -> dict[ActivityType, CustomZonesConfig]:
-		"""Fetches all zone configurations for the user and organizes them by ActivityType."""
-		user_configs = CustomZonesConfig.objects.filter(user=self.user).prefetch_related(
-			"zones_definition"
-		)
-
-		configs_map: dict[ActivityType, CustomZonesConfig] = {}
-		has_explicit_default = False
-		for config in user_configs:
-			try:
-				activity_type_enum = ActivityType(config.activity_type)
-				configs_map[activity_type_enum] = config
-				if activity_type_enum == ActivityType.DEFAULT:
-					has_explicit_default = True
-					if not config.zones_definition.exists():
-						self.logger.warning(
-							f"Explicit default CustomZonesConfig {config.id} for user {self.user.strava_id} "  # noqa: E501
-							"has no zone definitions. Time will be 'outside zones'."
-						)
-			except ValueError:
-				self.logger.error(
-					f"Invalid activity_type '{config.activity_type}' in DB for CustomZonesConfig {config.id} "  # noqa: E501
-					f"for user {self.user.strava_id}. Skipping this config."
-				)
-
-		if not has_explicit_default:
-			self.logger.info(
-				f"No explicit DEFAULT config in DB for user {self.user.strava_id}. "
-				"Checking via _get_default_zones_config."
-			)
-			default_config_from_method = self._get_default_zones_config()
-			if default_config_from_method:
-				configs_map[ActivityType.DEFAULT] = default_config_from_method  # type: ignore[index]
-			# If default_config_from_method is None, process_user_activities will handle it.
-
-		return configs_map
-
-	def _map_strava_activity_to_config_type(
-		self, strava_activity_type_str: str | None
-	) -> ActivityType:
-		"""Maps a Strava activity type string to our internal ActivityType enum."""
-		if not strava_activity_type_str:
-			return ActivityType.DEFAULT  # type: ignore[return-value]
-
-		# Common Strava activity types: https://developers.strava.com/docs/reference/#api-models-ActivityType
-		# We are simplifying to RUN, RIDE, or DEFAULT
-		# Note: Case-sensitive matching as per Strava's typical API responses.
-		RUN_TYPES = {"Run", "VirtualRun", "TrailRun"}
-		RIDE_TYPES = {"Ride", "VirtualRide", "EBikeRide", "Handcycle", "Velomobile"}
-
-		if strava_activity_type_str in RUN_TYPES:
-			return ActivityType.RUN  # type: ignore[return-value]
-		if strava_activity_type_str in RIDE_TYPES:
-			return ActivityType.RIDE  # type: ignore[return-value]
-
-		# For other types like Swim, AlpineSki, Kayaking, etc., use default.
-		return ActivityType.DEFAULT  # type: ignore[return-value]
 
 	def process_user_activities(self, after_timestamp: int | None = None) -> None:  # noqa: C901
 		"""Process user activities.
@@ -231,14 +140,6 @@ class StravaHRWorker:
 			f"Processed {processed_count} activities with HR data."
 		)
 
-	@staticmethod
-	def _parse_activity_date(
-		activity_date_attr: str | timezone.datetime | Any,
-	) -> timezone.datetime:
-		if isinstance(activity_date_attr, str):
-			return timezone.datetime.fromisoformat(activity_date_attr.replace("Z", "+00:00"))
-		return activity_date_attr
-
 	def fetch_and_store_strava_hr_zones(self) -> bool:
 		"""Fetches HR zones from Strava and stores them in the database.
 
@@ -309,3 +210,102 @@ class StravaHRWorker:
 				f"Error fetching/storing Strava HR zones for user {self.user.strava_id}: {e}"
 			)
 			return False
+
+	def _get_default_zones_config(self) -> CustomZonesConfig | None:
+		try:
+			config = CustomZonesConfig.objects.get(
+				user=self.user, activity_type=ActivityType.DEFAULT
+			)
+			if not config.zones_definition.exists():
+				self.logger.warning(
+					f"Default CustomZonesConfig {config.id} for user {self.user.strava_id} "
+					"has no zone definitions. Will treat all time as 'outside zones'."
+				)
+				# We can still proceed, calculate_time_in_zones will handle this
+			return config
+		except CustomZonesConfig.DoesNotExist:
+			self.logger.warning(
+				f"No default CustomZonesConfig found for user {self.user.strava_id}. "
+				"Cannot process HR data without zone definitions."
+			)
+			return None
+		except CustomZonesConfig.MultipleObjectsReturned:
+			self.logger.warning(
+				f"Multiple default CustomZonesConfigs found for user {self.user.strava_id}. "
+				"Using the first one. Please ensure only one default config per user."
+			)
+			config = CustomZonesConfig.objects.filter(
+				user=self.user, activity_type=ActivityType.DEFAULT
+			).first()
+			if config and not config.zones_definition.exists():
+				self.logger.warning(
+					f"Selected CustomZonesConfig {config.id} for user {self.user.strava_id} "
+					"has no zone definitions."
+				)
+			return config
+
+	def _get_all_user_zone_configs(self) -> dict[ActivityType, CustomZonesConfig]:
+		"""Fetches all zone configurations for the user and organizes them by ActivityType."""
+		user_configs = CustomZonesConfig.objects.filter(user=self.user).prefetch_related(
+			"zones_definition"
+		)
+
+		configs_map: dict[ActivityType, CustomZonesConfig] = {}
+		has_explicit_default = False
+		for config in user_configs:
+			try:
+				activity_type_enum = ActivityType(config.activity_type)
+				configs_map[activity_type_enum] = config
+				if activity_type_enum == ActivityType.DEFAULT:
+					has_explicit_default = True
+					if not config.zones_definition.exists():
+						self.logger.warning(
+							f"Explicit default CustomZonesConfig {config.id} for user {self.user.strava_id} "  # noqa: E501
+							"has no zone definitions. Time will be 'outside zones'."
+						)
+			except ValueError:
+				self.logger.error(
+					f"Invalid activity_type '{config.activity_type}' in DB for CustomZonesConfig {config.id} "  # noqa: E501
+					f"for user {self.user.strava_id}. Skipping this config."
+				)
+
+		if not has_explicit_default:
+			self.logger.info(
+				f"No explicit DEFAULT config in DB for user {self.user.strava_id}. "
+				"Checking via _get_default_zones_config."
+			)
+			default_config_from_method = self._get_default_zones_config()
+			if default_config_from_method:
+				configs_map[ActivityType.DEFAULT] = default_config_from_method  # type: ignore[index]
+			# If default_config_from_method is None, process_user_activities will handle it.
+
+		return configs_map
+
+	def _map_strava_activity_to_config_type(
+		self, strava_activity_type_str: str | None
+	) -> ActivityType:
+		"""Maps a Strava activity type string to our internal ActivityType enum."""
+		if not strava_activity_type_str:
+			return ActivityType.DEFAULT  # type: ignore[return-value]
+
+		# Common Strava activity types: https://developers.strava.com/docs/reference/#api-models-ActivityType
+		# We are simplifying to RUN, RIDE, or DEFAULT
+		# Note: Case-sensitive matching as per Strava's typical API responses.
+		RUN_TYPES = {"Run", "VirtualRun", "TrailRun"}
+		RIDE_TYPES = {"Ride", "VirtualRide", "EBikeRide", "Handcycle", "Velomobile"}
+
+		if strava_activity_type_str in RUN_TYPES:
+			return ActivityType.RUN  # type: ignore[return-value]
+		if strava_activity_type_str in RIDE_TYPES:
+			return ActivityType.RIDE  # type: ignore[return-value]
+
+		# For other types like Swim, AlpineSki, Kayaking, etc., use default.
+		return ActivityType.DEFAULT  # type: ignore[return-value]
+
+	@staticmethod
+	def _parse_activity_date(
+		activity_date_attr: str | timezone.datetime | Any,
+	) -> timezone.datetime:
+		if isinstance(activity_date_attr, str):
+			return timezone.datetime.fromisoformat(activity_date_attr.replace("Z", "+00:00"))
+		return activity_date_attr
