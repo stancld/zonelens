@@ -120,15 +120,6 @@ class StravaApiClient:
 		-------
 			A list of activity data as dictionaries, or None if an error occurs.
 		"""
-		if not self.strava_user.access_token:
-			# If no access token, attempt refresh if refresh_token exists.
-			# This handles cases where token might be missing (e.g. app restart).
-			logger.info(f"No access token for user {self.strava_user.strava_id}, trying refresh.")
-			if not self.refresh_strava_token():
-				raise ValueError(
-					f"Cannot retrieve access token for user {self.strava_user.strava_id}."
-				)
-
 		params: dict[str, int | str] = {"page": page, "per_page": per_page}
 		if before is not None:
 			params["before"] = before
@@ -317,19 +308,12 @@ class StravaApiClient:
 		-------
 		    A dictionary containing the activity data, or None if an error occurs.
 		"""
-		if not self.strava_user.access_token:
-			logger.info(f"No access token for user {self.strava_user.strava_id}, trying refresh.")
-			if not self.refresh_strava_token():
-				raise ValueError(
-					f"Cannot retrieve access token for user {self.strava_user.strava_id}."
-				)
-
 		try:
 			response = StravaApiClient.get(
 				url=STRAVA_API_ACTIVITY_DETAIL_URL_TEMPLATE.format(activity_id=activity_id),
 				access_token=self.access_token,
 			)
-			response.raise_for_status()  # Raise HTTPError for bad responses (4XX or 5XX)
+			response.raise_for_status()
 			return response.json()
 		except requests.exceptions.HTTPError as e:
 			logger.error(
@@ -356,19 +340,11 @@ class StravaApiClient:
 			A dictionary containing the stream data (e.g., {'time': {...}, 'heartrate': {...}})
 			or None if an error occurs or streams are not available.
 		"""
-		if not self.access_token:
-			logger.error(
-				f"No access token available for Strava user {self.strava_user.strava_id}."
-			)
-			return None
-
-		params = {"keys": "heartrate,time", "key_by_type": "true"}
-
 		try:
 			response = self.get(
 				url=STRAVA_API_STREAMS_URL_TEMPLATE.format(activity_id=activity_id),
 				access_token=self.access_token,
-				params=params,
+				params={"keys": "heartrate,time", "key_by_type": "true"},
 			)
 			response.raise_for_status()  # Raise HTTPError for bad responses (4XX or 5XX)
 			streams_data = response.json()
