@@ -309,7 +309,7 @@ class StravaApiClient:
 		    A dictionary containing the activity data, or None if an error occurs.
 		"""
 		try:
-			response = StravaApiClient.get(
+			response = self.get(
 				url=STRAVA_API_ACTIVITY_DETAIL_URL_TEMPLATE.format(activity_id=activity_id),
 				access_token=self.access_token,
 			)
