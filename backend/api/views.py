@@ -895,19 +895,13 @@ class StravaWebhookAPIView(APIView):
 		object_type = event_data.get("object_type")
 		aspect_type = event_data.get("aspect_type")
 		owner_id = event_data.get("owner_id")
-		activity_id = event_data.get("object_id")  # This is the activity_id
+		activity_id = event_data.get("object_id")
 
 		if object_type == "activity" and aspect_type == "create":
-			if not owner_id or not activity_id:
-				logger.error(
-					f"Missing owner_id ({owner_id}) or object_id ({activity_id}) "
-					f"in webhook event: {event_data}"
-				)
-				return Response(
-					{"status": "error", "message": "Missing owner_id or object_id"},
-					status=status.HTTP_400_BAD_REQUEST,
-				)
-
+			if response := self._check_for_owner_and_activity_ids(
+				owner_id, activity_id, event_data
+			):
+				return response
 			logger.info(f"Processing 'create activity' event activity_id: {activity_id}.")
 			try:
 				worker = Worker(user_strava_id=owner_id)
@@ -922,6 +916,21 @@ class StravaWebhookAPIView(APIView):
 			)
 
 		return Response({"status": "event received"}, status=status.HTTP_200_OK)
+
+	@staticmethod
+	def _check_for_owner_and_activity_ids(
+		owner_id: int, activity_id: int, event_data: dict[str, Any]
+	) -> Response | None:
+		if not owner_id or not activity_id:
+			logger.error(
+				f"Missing owner_id ({owner_id}) or object_id ({activity_id}) "
+				f"in webhook event: {event_data}"
+			)
+			return Response(
+				{"status": "error", "message": "Missing owner_id or object_id"},
+				status=status.HTTP_400_BAD_REQUEST,
+			)
+		return None
 
 
 # Strava OAuth Views remain unchanged below
