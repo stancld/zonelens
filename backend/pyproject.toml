@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "strava-zones-backend"
-version = "0.1.6"
+version = "0.2.1"
 description = "Backend API for Strava HR Zone Calendar Visualization extension"
 authors = [
 	{name = "Daniel Stancl", email = "daniel.stancl@gmail.com"},
@@ -17,6 +17,7 @@ dependencies = [
     "django-extensions",
     "djangorestframework",
     "gunicorn",
+    "ipython",
     "psycopg2-binary",
     "pyOpenSSL",
     "python-dotenv",

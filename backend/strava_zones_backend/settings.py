@@ -243,5 +243,5 @@ except ValueError as e:
 # Strava API credentials
 STRAVA_CLIENT_ID = os.getenv("STRAVA_CLIENT_ID")
 STRAVA_CLIENT_SECRET = os.getenv("STRAVA_CLIENT_SECRET")
-if not STRAVA_CLIENT_ID or not STRAVA_CLIENT_SECRET:
-	logger.warning("STRAVA_CLIENT_ID or STRAVA_CLIENT_SECRET environment variables are not set.")
+# Strava API Webhook info credentials
+STRAVA_WEBHOOK_VERIFY_TOKEN = os.getenv("STRAVA_WEBHOOK_VERIFY_TOKEN")

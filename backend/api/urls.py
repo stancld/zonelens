@@ -43,4 +43,9 @@ urlpatterns = [
 		views.UserHRZonesDisplayView.as_view(),
 		name="user_hr_zones_display",
 	),
+	path(
+		"strava/webhook/",
+		views.StravaWebhookAPIView.as_view(),
+		name="strava_webhook",
+	),
 ]

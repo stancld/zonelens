@@ -31,4 +31,4 @@ USER appuser
 
 EXPOSE 8000
 
-CMD ["gunicorn", "--bind", "0.0.0.0:8000", "strava_zones_backend.wsgi:application"]
+CMD ["gunicorn", "--workers", "4", "--bind", "0.0.0.0:8000", "strava_zones_backend.wsgi:application"]
