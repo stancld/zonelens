@@ -910,6 +910,19 @@ class StravaWebhookAPIView(APIView):
 				logger.exception(
 					f"Unexpected error processing webhook for activity {activity_id}: {e}."
 				)
+		elif object_type == "activity" and aspect_type == "delete":
+			if response := self._check_for_owner_and_activity_ids(
+				owner_id, activity_id, event_data
+			):
+				return response
+			logger.info(f"Processing 'delete activity' event activity_id: {activity_id}.")
+			try:
+				worker = Worker(user_strava_id=owner_id)
+				worker.delete_activity(user_strava_id=owner_id, activity_id=activity_id)
+			except Exception as e:
+				logger.exception(
+					f"Unexpected error processing webhook for deleting activity {activity_id}: {e}."  # noqa: E501
+				)
 		else:
 			logger.info(
 				f"Ignoring webhook event, object_type={object_type!r}, aspect_type={aspect_type!r}"

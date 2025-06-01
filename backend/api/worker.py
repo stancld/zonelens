@@ -184,6 +184,27 @@ class Worker:
 
 		self.logger.info(f"Successfully processed activity {activity_id}.")
 
+	def delete_activity(self, user_strava_id: int, activity_id: int) -> None:
+		"""Delete activity records from database upon deleting activity from Strava."""
+		self.logger.info(f"Deleting activity {activity_id} for user {user_strava_id}")
+
+		# Verify the activity belongs to the user
+		activity = ActivityZoneTimes.objects.filter(
+			user=self.user, activity_id=activity_id
+		).first()
+
+		if not activity:
+			self.logger.info(f"No records found for activity {activity_id}")
+			return
+
+		num_deleted, _ = ActivityZoneTimes.objects.filter(
+			user=self.user, activity_id=activity_id
+		).delete()
+
+		self.logger.info(
+			f"Deleted {num_deleted} records for activity {activity_id} for user {user_strava_id}"
+		)
+
 	def fetch_and_store_strava_hr_zones(self) -> bool:
 		"""Fetches HR zones from Strava and stores them in the database.
 
