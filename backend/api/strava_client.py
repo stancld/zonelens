@@ -31,6 +31,7 @@ STRAVA_TOKEN_URL = f"{STRAVA_API_BASE_URL}/oauth/token"
 STRAVA_API_ACTIVITIES_URL = f"{STRAVA_API_BASE_URL}/athlete/activities"
 STRAVA_API_STREAMS_URL_TEMPLATE = f"{STRAVA_API_BASE_URL}/activities/{{activity_id}}/streams"
 STRAVA_API_ATHLETE_ZONES_URL = f"{STRAVA_API_BASE_URL}/athlete/zones"
+STRAVA_API_ACTIVITY_DETAIL_URL_TEMPLATE = f"{STRAVA_API_BASE_URL}/activities/{{activity_id}}"
 
 # Default per_page, Strava API max is 200
 STRAVA_API_MAX_PER_PAGE = 200
@@ -188,7 +189,7 @@ class StravaApiClient:
 
 		Returns
 		-------
-			A dic of zone data as dictionaries, or None if an error occurs.
+			A dict of zone data as dictionaries, or None if an error occurs.
 		"""
 		logger.info(f"Fetching athlete zones for user {self.strava_user.strava_id}")
 		if not self.strava_user.access_token:
@@ -308,6 +309,34 @@ class StravaApiClient:
 			page += 1
 
 		return all_activities
+
+	def fetch_activity_details(self, activity_id: int) -> dict[str, Any] | None:
+		"""Fetches details for a single activity from the Strava API.
+
+		Returns
+		-------
+		    A dictionary containing the activity data, or None if an error occurs.
+		"""
+		if not self.strava_user.access_token:
+			logger.info(f"No access token for user {self.strava_user.strava_id}, trying refresh.")
+			if not self.refresh_strava_token():
+				raise ValueError(
+					f"Cannot retrieve access token for user {self.strava_user.strava_id}."
+				)
+
+		try:
+			response = StravaApiClient.get(
+				url=STRAVA_API_ACTIVITY_DETAIL_URL_TEMPLATE.format(activity_id=activity_id),
+				access_token=self.access_token,
+			)
+			response.raise_for_status()  # Raise HTTPError for bad responses (4XX or 5XX)
+			return response.json()
+		except requests.exceptions.HTTPError as e:
+			logger.error(
+				f"Request error fetching details for activity {activity_id} "
+				f"for user {self.strava_user.strava_id}: {e}"
+			)
+			return None
 
 	def fetch_activity_streams(
 		self, activity_id: int, attempt_refresh: bool = True

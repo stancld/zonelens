@@ -17,6 +17,7 @@ dependencies = [
     "django-extensions",
     "djangorestframework",
     "gunicorn",
+    "ipython",
     "psycopg2-binary",
     "pyOpenSSL",
     "python-dotenv",
