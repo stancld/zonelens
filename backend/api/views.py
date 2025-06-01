@@ -861,6 +861,69 @@ class UserHRZonesDisplayView(LoginRequiredMixin, TemplateView):
 		return redirect(request.path_info)
 
 
+class StravaWebhookAPIView(APIView):
+	"""Handle Strava webhook events."""
+
+	permission_classes: list = []  # Webhooks are not authenticated via DRF tokens
+
+	def get(self, request: Request) -> Response:
+		"""Verify webhook subscription."""
+		hub_challenge = request.query_params.get("hub.challenge")
+		hub_mode = request.query_params.get("hub.mode")
+		hub_verify_token = request.query_params.get("hub.verify_token")
+
+		hub_info = f"mode={hub_mode!r}, token={hub_verify_token!r}, challenge={hub_challenge!r}"
+		logger.info(f"Strava webhook verification attempt: {hub_info}.")
+
+		if hub_mode == "subscribe" and hub_verify_token == settings.STRAVA_WEBHOOK_VERIFY_TOKEN:
+			logger.info(
+				f"Webhook verification successful. Responding with challenge: {hub_challenge}"
+			)
+			return Response({"hub.challenge": hub_challenge}, status=status.HTTP_200_OK)
+
+		logger.error(f"Webhook verification failed. Mode: {hub_mode}.")
+		return Response(
+			{"status": "error", "message": "Verification failed"},
+			status=status.HTTP_403_FORBIDDEN,
+		)
+
+	def post(self, request: Request) -> Response:
+		"""Receive and process event notification."""
+		event_data = request.data
+		logger.info(f"Received Strava webhook event: {json.dumps(event_data)}")
+
+		object_type = event_data.get("object_type")
+		aspect_type = event_data.get("aspect_type")
+		owner_id = event_data.get("owner_id")
+		activity_id = event_data.get("object_id")  # This is the activity_id
+
+		if object_type == "activity" and aspect_type == "create":
+			if not owner_id or not activity_id:
+				logger.error(
+					f"Missing owner_id ({owner_id}) or object_id ({activity_id}) "
+					f"in webhook event: {event_data}"
+				)
+				return Response(
+					{"status": "error", "message": "Missing owner_id or object_id"},
+					status=status.HTTP_400_BAD_REQUEST,
+				)
+
+			logger.info(f"Processing 'create activity' event activity_id: {activity_id}.")
+			try:
+				worker = Worker(user_strava_id=owner_id)
+				worker.process_new_activity(user_strava_id=owner_id, activity_id=activity_id)
+			except Exception as e:
+				logger.exception(
+					f"Unexpected error processing webhook for activity {activity_id}: {e}."
+				)
+		else:
+			logger.info(
+				f"Ignoring webhook event, object_type={object_type!r}, aspect_type={aspect_type!r}"
+			)
+
+		return Response({"status": "event received"}, status=status.HTTP_200_OK)
+
+
 # Strava OAuth Views remain unchanged below
 class StravaAuthorizeView(LoginRequiredMixin, View):
 	"""Redirects the user to Strava's authorization page."""

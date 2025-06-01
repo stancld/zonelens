@@ -41,7 +41,7 @@ class Worker:
 		self.logger = get_logger(__name__)
 
 	def process_user_activities(self, after_timestamp: int | None = None) -> None:  # noqa: C901
-		"""Process user activities.
+		"""Process user activities in bulk after the account setup.
 
 		Fetches user's Strava activities after a given unix timestamp,
 		processes heart rate data, and stores results in ActivityZoneTimes.
@@ -79,9 +79,8 @@ class Worker:
 			# Ensure activity_date is timezone-aware if it's naive
 			if timezone.is_naive(activity_date):
 				activity_date = timezone.make_aware(activity_date, timezone.utc)
-			has_hr = activity_summary.get("has_heartrate", False)
 
-			if not has_hr:
+			if not activity_summary.get("has_heartrate", False):
 				self.logger.info(
 					f"Activity {activity_id} for user {self.user.strava_id} "
 					f"(date: {activity_date.date()}) has no heart rate data. Skipping."
@@ -140,6 +139,60 @@ class Worker:
 			f"Processed {processed_count} activities with HR data."
 		)
 
+	def process_new_activity(self, user_strava_id: int, activity_id: int) -> None:
+		"""Process a single new activity for a given user upon a webhook event notification."""
+		self.logger.info(f"Starting processing activity {activity_id} for user {user_strava_id}.")
+
+		try:
+			if not (activity_summary := self.strava_client.fetch_activity_details(activity_id)):
+				self.logger.error(f"Failed to fetch details for activity {activity_id}.")
+				return
+
+			activity_date = self._parse_activity_date(activity_summary.get("start_date"))
+			if timezone.is_naive(activity_date):
+				activity_date = timezone.make_aware(activity_date, timezone.utc)
+
+			if not activity_summary.get("has_heartrate", False):
+				self.logger.info(f"Activity {activity_id} has no heart rate data. Skipping.")
+				return
+
+			all_zone_configs = self._get_all_user_zone_configs()
+			if not (default_zones_config := all_zone_configs.get(ActivityType.DEFAULT)):  # type: ignore[call-overload]
+				self.logger.error(f"Default zones config not found for user {user_strava_id}.")
+
+			target_config_type = self._map_strava_activity_to_config_type(
+				activity_summary.get("type")
+			)
+			selected_zones_config = all_zone_configs.get(target_config_type, default_zones_config)
+
+			if not (streams_data := self.strava_client.fetch_activity_streams(activity_id)):
+				self.logger.error(f"Failed to fetch stream for activity {activity_id}.")
+
+			time_data, hr_data = parse_activity_streams(streams_data)
+			zone_times_dict = calculate_time_in_zones(time_data, hr_data, selected_zones_config)
+
+			if time_outside_zone := zone_times_dict.pop(OUTSIDE_ZONES_KEY, 0):
+				self.logger.warning(
+					f"There is {time_outside_zone} s outside any zone for activity {activity_id}."
+				)
+
+			for zone_name, duration_seconds in zone_times_dict.items():
+				if duration_seconds > 0:
+					ActivityZoneTimes.objects.create(
+						user=self.user,
+						activity_id=activity_id,
+						zone_name=zone_name,
+						duration_seconds=duration_seconds,
+						activity_date=activity_date,
+					)
+
+			self.logger.info(f"Successfully processed activity {activity_id}.")
+
+		except Exception as e:
+			self.logger.exception(
+				f"An unexpected error occurred while processing activity {activity_id}: {e}"
+			)
+
 	def fetch_and_store_strava_hr_zones(self) -> bool:
 		"""Fetches HR zones from Strava and stores them in the database.
 
@@ -176,7 +229,7 @@ class Worker:
 					f"No HR zones found on Strava for user {self.user.strava_id}. "
 					f"Any existing zones for default config {config.id} have been cleared."
 				)
-				return True  # Operation successful, state reflects no zones
+				return True
 
 			# Strava returned HR zones, so create them
 			new_zones_to_create = []
