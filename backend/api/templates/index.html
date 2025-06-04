@@ -123,6 +123,17 @@
         .strava-connect-img:hover {
             opacity: 0.9;
         }
+        .strava-logo-container {
+            position: fixed;
+            bottom: 15px;
+            right: 15px;
+            z-index: 1000;
+        }
+        .strava-logo-container img {
+            max-height: 40px;
+            width: auto;
+            display: block;
+        }
     </style>
 </head>
 <body>
@@ -145,6 +156,10 @@
             <h2>Error</h2>
             <p id="error-message"></p>
         </div>
+    </div>
+
+    <div class="strava-logo-container">
+        <img src="{% static 'images/api_logo_pwrdBy_strava_stack_orange.png' %}" alt="Powered by Strava">
     </div>
 
     <p class="author-credit">Authored by stancld</p>
