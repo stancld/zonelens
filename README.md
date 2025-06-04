@@ -127,20 +127,36 @@ This project uses Docker for easier setup and consistent development environment
 
 ## ⚙️ API Endpoints Overview
 
-*   **Authentication:**
-    *   `GET /api/auth/strava/`: Initiates Strava OAuth2 flow.
-    *   `GET /api/auth/strava/callback/`: Handles OAuth2 callback.
-    *   `GET /api/profile/`: User profile (requires auth).
-*   **Data Sync:**
-    *   `POST /api/strava/sync-activities/`: Triggers activity sync (requires auth).
-*   **HR Zones Configuration:**
-    *   `GET, POST /api/settings/custom-zones/`: List or create custom HR zones.
-    *   `GET, PUT, DELETE /api/settings/custom-zones/<uuid:pk>/`: Manage specific HR zone config.
-    *   `POST /api/fetch-strava-hr-zones/`: Fetch and store HR zones from Strava.
-    *   `GET /api/user/hr-zones/`: HTML page for HR zone management.
-    *   `GET /api/user/hr-zone-status/`: Status of user's HR zone config.
-*   **Aggregated Data for Extension:**
-    *   `GET /api/zones/`: Provides aggregated zone data (e.g., time in zones per week/month for the calendar).
+The backend exposes the following API endpoints. Unless otherwise noted, API endpoints are prefixed with `/api/`.
+
+**Publicly Accessible Web Pages:**
+*   `GET /`: The main landing page (`index.html`). *(Note: Served by the main application router, not prefixed by `/api/`)*.
+*   `GET /api/user/hr-zones/`: User interface for managing Heart Rate Zones. **(Web Page)**
+
+**Authentication Endpoints:**
+*   `GET /api/auth/strava/`: Initiates the Strava OAuth2 authentication flow.
+*   `GET /api/auth/strava/callback/`: Handles the OAuth2 callback from Strava after user authorization.
+*   `GET /api/profile/`: Retrieves the authenticated user's profile information. (Requires authentication)
+
+**Data Synchronization & Webhook Endpoints:**
+*   `POST /api/strava/sync-activities/`: Triggers a synchronization of the user's recent activities from Strava. (Requires authentication)
+*   `GET, POST /api/strava/webhook/`: Endpoint for Strava webhooks.
+    *   `GET`: Handles Strava's webhook subscription validation request.
+    *   `POST`: Receives webhook events from Strava (e.g., new activity created, activity title changed).
+
+**Heart Rate Zones Configuration Endpoints:**
+*   `GET /api/user/hr-zone-status/`: Checks if the user has HR zones configured and returns their status. (Requires authentication)
+*   `POST /api/fetch-strava-hr-zones/`: Fetches the user's default HR zones from Strava and saves them to their profile. (Requires authentication)
+*   `GET, POST /api/settings/custom-zones/`:
+    *   `GET`: Lists all custom HR zone configurations for the authenticated user.
+    *   `POST`: Creates a new custom HR zone configuration for the authenticated user. (Requires authentication for both methods)
+*   `GET, PUT, DELETE /api/settings/custom-zones/<uuid:pk>/`:
+    *   `GET`: Retrieves a specific custom HR zone configuration.
+    *   `PUT`: Updates a specific custom HR zone configuration.
+    *   `DELETE`: Deletes a specific custom HR zone configuration. (Requires authentication for all methods)
+
+**Aggregated Data Endpoints (for Chrome Extension):**
+*   `GET /api/zones/`: Provides aggregated time-in-zone data for activities, typically used by the Chrome extension to display on the calendar. (Requires authentication)
 
 ## 📜 License
 
