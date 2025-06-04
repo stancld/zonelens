@@ -320,7 +320,13 @@ nav {
         {% endif %}
 
         <div style="margin-top: 20px; text-align: center;">
-            <button id="fetchStravaHrZonesButton">Fetch/Refresh HR Zones from Strava</button>
+            <button id="fetchStravaHrZonesButton">
+                {% if user_zone_configurations %}
+                    Fetch/Refresh HR Zones from Strava
+                {% else %}
+                    Fetch HR Zones from Strava
+                {% endif %}
+            </button>
             <div id="fetchStatusMessage"></div>
         </div>
     </div>
