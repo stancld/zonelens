@@ -1,4 +1,5 @@
 {% extends "api/base.html" %}
+{% load static %}
 
 {% block title %}Your Custom Heart Rate Zones{% endblock %}
 
@@ -195,6 +196,17 @@ nav {
         }
         p.back-link a:hover {
             color: #333;
+        }
+        .strava-logo-container {
+            position: fixed;
+            bottom: 15px;
+            right: 15px;
+            z-index: 1000;
+        }
+        .strava-logo-container img {
+            max-height: 40px;
+            width: auto;
+            display: block;
         }
     </style>
 
@@ -711,10 +723,9 @@ document.addEventListener('DOMContentLoaded', function() {
               existingHiddenInput.remove();
             }
 
-            // Create and append a new hidden input for the selected activity type
             const hiddenActivityTypeInput = document.createElement('input');
             hiddenActivityTypeInput.type = 'hidden';
-            hiddenActivityTypeInput.name = 'new_activity_type'; // This is what the backend expects
+            hiddenActivityTypeInput.name = 'new_activity_type';
             hiddenActivityTypeInput.value = selectedActivityType;
             mainHrZonesForm.appendChild(hiddenActivityTypeInput);
 
@@ -732,5 +743,7 @@ document.addEventListener('DOMContentLoaded', function() {
   });
 })();
 </script>
-
-{% endblock %}
+    <div class="strava-logo-container">
+        <img src="{% static 'images/api_logo_pwrdBy_strava_stack_orange.png' %}" alt="Powered by Strava">
+    </div>
+{% endblock content %}
