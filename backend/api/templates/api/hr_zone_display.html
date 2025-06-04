@@ -319,7 +319,7 @@ nav {
             <p class="info-message">No heart rate zone configurations found. You can <a href="{% url 'strava_auth' %}?next={{ request.path }}">connect your Strava account</a> or set them up manually if supported.</p>
         {% endif %}
 
-        <div style="margin-top: 20px;">
+        <div style="margin-top: 20px; text-align: center;">
             <button id="fetchStravaHrZonesButton">Fetch/Refresh HR Zones from Strava</button>
             <div id="fetchStatusMessage"></div>
         </div>
