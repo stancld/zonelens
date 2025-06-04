@@ -68,7 +68,7 @@ Once the extension is available on the Chrome Web Store:
 ## 🛠️ Technology Stack
 
 *   **Backend:** Python, Django, Django REST Framework, Gunicorn
-*   **Frontend (Extension):** JavaScript, HTML, CSS
+*   **Extension:** JavaScript, HTML, CSS
 *   **Database:** PostgreSQL
 *   **Containerization:** Docker, Docker Compose
 *   **CI/CD:** GitHub Actions
