@@ -1,4 +1,4 @@
-# Strava Zones Coding Guidelines
+# ZoneLens Coding Guidelines
 
 (Used for LLM instructions)
 

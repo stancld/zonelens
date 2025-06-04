@@ -10,7 +10,7 @@
     <link rel="icon" type="image/png" sizes="192x192" href="{% static 'images/icon-192.png' %}">
     <link rel="icon" type="image/png" sizes="512x512" href="{% static 'images/icon-512.png' %}">
 
-    <title>Strava Zones - Login</title>
+    <title>ZoneLens - Login</title>
     <style>
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
@@ -108,19 +108,47 @@
             margin-top: 30px;
             text-align: center;
         }
+        .strava-connect-link {
+            display: inline-block;
+            margin-top: 20px;
+            text-decoration: none;
+        }
+        .strava-connect-img {
+            height: 50px;
+            width: auto;
+            border: none;
+            vertical-align: middle;
+            cursor: pointer;
+        }
+        .strava-connect-img:hover {
+            opacity: 0.9;
+        }
+        .strava-logo-container {
+            position: fixed;
+            bottom: 15px;
+            right: 15px;
+            z-index: 1000;
+        }
+        .strava-logo-container img {
+            max-height: 40px;
+            width: auto;
+            display: block;
+        }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>Welcome to Strava Zones!</h1>
+        <h1>Welcome to ZoneLens!</h1>
         <div id="auth-section">
             <p>Customize your Strava activity heart rate and power zones with ease. Connect your Strava account to get started.</p>
-            <button class="strava-button" onclick="window.location.href='/api/auth/strava'">Login with Strava</button>
+            <a href="/api/auth/strava" class="strava-connect-link">
+                <img src="{% static 'images/btn_strava_connect_with_orange_x2.png' %}" alt="Login with Strava" class="strava-connect-img">
+            </a>
         </div>
 
         <div id="profile" style="display: none;">
-            <h2>Authenticated Profile</h2>
-            <pre id="profile-data"></pre>
+            <h2>Connection Status</h2>
+            <p id="connection-status-message" style="text-align: center; font-size: 1.2em; margin-top: 20px; margin-bottom: 20px; color: #333;"></p>
             <button class="logout-button" onclick="logout()">Logout</button>
         </div>
 
@@ -130,12 +158,16 @@
         </div>
     </div>
 
+    <div class="strava-logo-container">
+        <img src="{% static 'images/api_logo_pwrdBy_strava_stack_orange.png' %}" alt="Powered by Strava">
+    </div>
+
     <p class="author-credit">Authored by stancld</p>
 
     <script>
         const authSection = document.getElementById('auth-section');
         const profileSection = document.getElementById('profile');
-        const profileData = document.getElementById('profile-data');
+        const connectionStatusMessage = document.getElementById('connection-status-message'); // Changed from profileData
         const errorSection = document.getElementById('error');
         const errorMessage = document.getElementById('error-message');
 
@@ -151,9 +183,13 @@
 
                 if (response.ok) {
                     const data = await response.json();
-                    profileData.textContent = JSON.stringify(data, null, 2);
-                    authSection.style.display = 'none';
-                    profileSection.style.display = 'block';
+                    if (data.first_name) {
+                    connectionStatusMessage.innerHTML = `Hi ${data.first_name}! You're connected. <span style="font-size: 1.5em;">🎉</span>`;
+                } else {
+                    connectionStatusMessage.innerHTML = `Successfully connected to Strava! <span style="font-size: 1.5em;">🎉</span>`;
+                }
+                authSection.style.display = 'none';
+                profileSection.style.display = 'block';
                     errorSection.style.display = 'none';
                 } else {
                     // Handle non-OK responses (e.g., 401 Unauthorized, 403 Forbidden)

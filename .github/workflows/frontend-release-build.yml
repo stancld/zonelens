@@ -1,14 +1,14 @@
-name: Frontend Release Build and Package
+name: Extension Release Build and Package
 
 on:
   push:
     branches:
-      - 'frontend/releases'
+      - 'extension/releases'
     tags:
       - 'strava-zones-v*.*.*'
 
 jobs:
-  build_and_package_frontend:
+  build_and_package_extension:
     runs-on: ubuntu-latest
     permissions:
       contents: write # Needed for softprops/action-gh-release to create/update releases
@@ -25,16 +25,16 @@ jobs:
         id: zip_details
         run: echo "ZIP_NAME=strava-zones-v${{ env.VERSION_TAG }}.zip" >> $GITHUB_ENV
 
-      - name: Zip frontend directory
+      - name: Zip extension directory
         run: |
-          echo "Zipping contents of frontend directory into ${{ env.ZIP_NAME }}"
-          cd frontend
+          echo "Zipping contents of extension directory into ${{ env.ZIP_NAME }}"
+          cd extension
           zip -r ../${{ env.ZIP_NAME }} .
           echo "Created zip file: ../${{ env.ZIP_NAME }}"
         shell: bash
 
       - name: Upload Artifact for branch push
-        if: startsWith(github.ref, 'refs/heads/frontend/releases')
+        if: startsWith(github.ref, 'refs/heads/extension/releases')
         uses: actions/upload-artifact@v4
         with:
           name: ${{ env.ZIP_NAME }}

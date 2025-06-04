@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "Strava HR Zones Display",
-  "version": "0.2.1",
-  "description": "Displays custom heart rate zone summaries on the Strava calendar.",
+  "name": "ZoneLens",
+  "version": "0.2.2",
+  "description": "Enhances your Strava experience by visualizing your Heart Rate (HR) zone data directly on your Training Calendar.",
   "permissions": [
     "activeTab",
     "storage",

@@ -1,4 +1,5 @@
 {% extends "api/base.html" %}
+{% load static %}
 
 {% block title %}Your Custom Heart Rate Zones{% endblock %}
 
@@ -154,9 +155,16 @@ nav {
             min-height: 1.5em; /* Prevent layout shift when empty */
         }
         .error-message {
-            color: #D8000C;
-            background-color: #FFD2D2;
-            border: 1px solid #D8000C;
+            background-color: #ffebee; /* Softer pink/red background */
+            color: #c62828; /* Softer, but still clear, red text */
+            padding: 15px;
+            border: 1px solid #ef9a9a; /* Softer red border */
+            border-radius: 5px;
+            margin-top: 15px;
+            margin-bottom: 25px;
+            text-align: center;
+            font-size: 0.95em;
+            line-height: 1.6;
         }
         .info-message {
             color: #00529B;
@@ -185,16 +193,16 @@ nav {
             text-decoration: underline;
             color: #005ea6;
         }
-
-        p.back-link {
-            margin-top: 30px;
-            font-size: 14px;
+        .strava-logo-container {
+            position: fixed;
+            bottom: 15px;
+            right: 15px;
+            z-index: 1000;
         }
-        p.back-link a {
-            color: #666;
-        }
-        p.back-link a:hover {
-            color: #333;
+        .strava-logo-container img {
+            max-height: 40px;
+            width: auto;
+            display: block;
         }
     </style>
 
@@ -318,12 +326,16 @@ nav {
             <p class="info-message">No heart rate zone configurations found. You can <a href="{% url 'strava_auth' %}?next={{ request.path }}">connect your Strava account</a> or set them up manually if supported.</p>
         {% endif %}
 
-        <div style="margin-top: 20px;">
-            <button id="fetchStravaHrZonesButton">Fetch/Refresh HR Zones from Strava</button>
+        <div style="margin-top: 20px; text-align: center;">
+            <button id="fetchStravaHrZonesButton">
+                {% if user_zone_configurations %}
+                    Fetch/Refresh HR Zones from Strava
+                {% else %}
+                    Fetch HR Zones from Strava
+                {% endif %}
+            </button>
             <div id="fetchStatusMessage"></div>
         </div>
-
-        <p class="back-link"><a href="/">Back to Home</a></p>
     </div>
 
 <script>
@@ -711,10 +723,9 @@ document.addEventListener('DOMContentLoaded', function() {
               existingHiddenInput.remove();
             }
 
-            // Create and append a new hidden input for the selected activity type
             const hiddenActivityTypeInput = document.createElement('input');
             hiddenActivityTypeInput.type = 'hidden';
-            hiddenActivityTypeInput.name = 'new_activity_type'; // This is what the backend expects
+            hiddenActivityTypeInput.name = 'new_activity_type';
             hiddenActivityTypeInput.value = selectedActivityType;
             mainHrZonesForm.appendChild(hiddenActivityTypeInput);
 
@@ -732,5 +743,7 @@ document.addEventListener('DOMContentLoaded', function() {
   });
 })();
 </script>
-
-{% endblock %}
+    <div class="strava-logo-container">
+        <img src="{% static 'images/api_logo_pwrdBy_strava_stack_orange.png' %}" alt="Powered by Strava">
+    </div>
+{% endblock content %}
