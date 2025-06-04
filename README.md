@@ -1,8 +1,8 @@
-# Strava Zones - Enhanced Training Calendar
+# ZoneLens - Enhanced Training Calendar
 
 <div align="center">
   <a href="https://strava-zones.com" target="_blank">
-    <img src="frontend/images/icon512.png" alt="Strava Zones Logo" width="128"/>
+    <img src="extension/images/icon512.png" alt="ZoneLens Logo" width="128"/>
   </a>
   <br/>
   <br/>
@@ -23,7 +23,7 @@
 
 </div>
 
-**Strava Zones** enhances your Strava experience by visualizing your Heart Rate (HR) zone data directly on your Training Calendar. Understand your training intensity at a glance and optimize your efforts!
+**ZoneLens** enhances your Strava experience by visualizing your Heart Rate (HR) zone data directly on your Training Calendar. Understand your training intensity at a glance and optimize your efforts!
 
 Visit our website: [strava-zones.com](https://strava-zones.com)
 
@@ -35,9 +35,9 @@ Visit our website: [strava-zones.com](https://strava-zones.com)
 
 ## ✨ Overview
 
-Strava Zones is a tool designed for athletes who want deeper insights into their training. It consists of a **Chrome Extension** that modifies your Strava Training Calendar page and a **Django backend** that securely processes your activity data via the Strava API.
+ZoneLens is a tool designed for athletes who want deeper insights into their training. It consists of a **Chrome Extension** that modifies your Strava Training Calendar page and a **Django backend** that securely processes your activity data via the Strava API.
 
-By fetching your activities and their detailed heart rate streams, Strava Zones calculates the time you've spent in each heart rate zone and displays this information clearly on your calendar, helping you track your training load and recovery effectively.
+By fetching your activities and their detailed heart rate streams, ZoneLens calculates the time you've spent in each heart rate zone and displays this information clearly on your calendar, helping you track your training load and recovery effectively.
 
 ## 🌟 Key Features
 
@@ -55,11 +55,11 @@ By fetching your activities and their detailed heart rate streams, Strava Zones 
   <img src="images/hr_config.png" alt="HR Configuration Screenshot" width="400" style="vertical-align:middle"/>
 </p>
 
-## 🧑‍💻 For Users: Getting Started with Strava Zones
+## 🧑‍💻 For Users: Getting Started with ZoneLens
 
 Once the extension is available on the Chrome Web Store:
 
-1.  **Install the Extension:** Search for "Strava Zones" on the Chrome Web Store and click "Add to Chrome".
+1.  **Install the Extension:** Search for "ZoneLens" on the Chrome Web Store and click "Add to Chrome".
 2.  **Connect to Strava:** Open the extension (usually from your browser's toolbar) and follow the prompts to authorize it with your Strava account.
 3.  **View Your Zones:** Navigate to your Strava Training Calendar. The extension will automatically enhance the calendar with your heart rate zone data!
 
@@ -110,7 +110,7 @@ This project uses Docker for easier setup and consistent development environment
     *   Open Chrome and navigate to `chrome://extensions`.
     *   Enable "Developer mode" (usually a toggle in the top right).
     *   Click "Load unpacked".
-    *   Select the `frontend/extension` directory from this project.
+    *   Select the `extension` directory from this project.
     *   Ensure the extension ID in `chrome://extensions` matches the `CHROME_EXTENSION_ID` in your backend's `.env` file if you've set `CSRF_TRUSTED_ORIGINS` to use it for stricter security during development.
 
 5.  **Access the Application:**
