@@ -5,7 +5,7 @@ on:
     branches:
       - 'extension/releases'
     tags:
-      - 'strava-zones-v*.*.*'
+      - 'zonelens-v*.*.*'
 
 jobs:
   build_and_package_extension:
@@ -18,12 +18,12 @@ jobs:
 
       - name: Get Version from Tag
         id: get_version
-        if: startsWith(github.ref, 'refs/tags/strava-zones-v')
-        run: echo "VERSION_TAG=${GITHUB_REF#refs/tags/strava-zones-v}" >> $GITHUB_ENV
+        if: startsWith(github.ref, 'refs/tags/zonelens-v')
+        run: echo "VERSION_TAG=${GITHUB_REF#refs/tags/zonelens-v}" >> $GITHUB_ENV
 
       - name: Determine Zip File Name
         id: zip_details
-        run: echo "ZIP_NAME=strava-zones-v${{ env.VERSION_TAG }}.zip" >> $GITHUB_ENV
+        run: echo "ZIP_NAME=zonelens-v${{ env.VERSION_TAG }}.zip" >> $GITHUB_ENV
 
       - name: Zip extension directory
         run: |
@@ -41,7 +41,7 @@ jobs:
           path: ${{ env.ZIP_NAME }}
 
       - name: Create or Update Release and Upload Asset (for tags)
-        if: startsWith(github.ref, 'refs/tags/strava-zones-v')
+        if: startsWith(github.ref, 'refs/tags/zonelens-v')
         uses: softprops/action-gh-release@v2
         with:
           files: ${{ env.ZIP_NAME }}
