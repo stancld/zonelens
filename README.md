@@ -51,15 +51,13 @@ By fetching your activities and their detailed heart rate streams, ZoneLens calc
 ## 📸 Screenshots
 
 <p align="center">
+  <img src="images/calendar.png" alt="Calender" width="400" style="vertical-align:middle"/>
   <img src="images/hr_config.png" alt="HR Configuration Screenshot" width="400" style="vertical-align:middle"/>
 </p>
 
 <p align="center">
-  <img src="images/hr_config.png" alt="HR Configuration Screenshot" width="400" style="vertical-align:middle"/>
-</p>
-
-<p align="center">
-  <img src="images/popup.png" alt="Popup" width="200" style="vertical-align:middle"/>
+  <img src="images/popup.png" alt="Popup" height="200" style="vertical-align:middle"/>
+  <img src="images/login.png" alt="Popup" height="200" style="vertical-align:middle"/>
 </p>
 
 ## 🧑‍💻 For Users: Getting Started with ZoneLens
