@@ -115,7 +115,10 @@ def strava_callback(request: HttpRequest) -> HttpResponse:
 
 		drf_token, _ = Token.objects.get_or_create(user=user)
 
-		context = {"token": drf_token.key, "frontend_redirect_url": "/"}
+		context = {
+			"token": drf_token.key,
+			"frontend_redirect_url": reverse("user_hr_zones_display"),
+		}
 		return render(request, "api/auth_callback.html", context)
 	except requests.exceptions.HTTPError:
 		return HttpResponse("Failed to authenticate with Strava (HTTPError).", status=400)
