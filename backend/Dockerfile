@@ -1,4 +1,4 @@
-# Production Dockerfile for Strava Zones Django Backend
+# Production Dockerfile for ZoneLens Django Backend
 FROM python:3.12-slim
 
 SHELL ["/bin/bash", "-c"]

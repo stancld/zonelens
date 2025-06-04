@@ -65,18 +65,18 @@ yarn-error.log*
 
 # Dependencies
 node_modules/
-frontend/node_modules/
+extension/node_modules/
 .pnp/
 .pnp.js
 
 # Production build folders
 /build/
-/frontend/build/
-/frontend/dist/
+/extension/build/
+/extension/dist/
 
 # Coverage and test reports
 /coverage/
-/frontend/coverage/
+/extension/coverage/
 /.nyc_output
 
 # Miscellaneous

@@ -38,7 +38,7 @@ input[type="text"] {
   text-align: center;
 }
 
-button {
+button:not(#loginButton) { /* Exclude the image 'button' from general button styling if it were a button tag */
   background-color: #FC4C02; /* Strava Orange */
   color: white;
   border: none;
@@ -50,7 +50,30 @@ button {
   transition: background-color 0.2s ease-in-out;
   width: 100%; /* Restore full width */
   box-sizing: border-box;
-  margin-bottom: 10px; /* Add space below each button */
+  margin-bottom: 10px; /* Add some space between buttons */
+}
+
+.strava-connect-link-popup {
+  display: block;
+  text-decoration: none;
+  margin-top: 2px;
+}
+
+#loginButton {
+  /* This ID now refers to the <img> tag */
+  background-color: transparent !important;
+  border: none !important;
+  padding: 0 !important;
+  height: 45px;
+  width: auto;
+  display: block;
+  margin-left: auto;
+  margin-right: auto;
+  cursor: pointer;
+}
+
+#loginButton:hover {
+  opacity: 0.9;
 }
 
 .button-container button:last-child {
