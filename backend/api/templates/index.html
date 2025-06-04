@@ -147,8 +147,8 @@
         </div>
 
         <div id="profile" style="display: none;">
-            <h2>Authenticated Profile</h2>
-            <pre id="profile-data"></pre>
+            <h2>Connection Status</h2>
+            <p id="connection-status-message" style="text-align: center; font-size: 1.2em; margin-top: 20px; margin-bottom: 20px; color: #333;"></p>
             <button class="logout-button" onclick="logout()">Logout</button>
         </div>
 
@@ -167,7 +167,7 @@
     <script>
         const authSection = document.getElementById('auth-section');
         const profileSection = document.getElementById('profile');
-        const profileData = document.getElementById('profile-data');
+        const connectionStatusMessage = document.getElementById('connection-status-message'); // Changed from profileData
         const errorSection = document.getElementById('error');
         const errorMessage = document.getElementById('error-message');
 
@@ -183,9 +183,13 @@
 
                 if (response.ok) {
                     const data = await response.json();
-                    profileData.textContent = JSON.stringify(data, null, 2);
-                    authSection.style.display = 'none';
-                    profileSection.style.display = 'block';
+                    if (data.first_name) {
+                    connectionStatusMessage.innerHTML = `Hi ${data.first_name}! You're connected. <span style="font-size: 1.5em;">🎉</span>`;
+                } else {
+                    connectionStatusMessage.innerHTML = `Successfully connected to Strava! <span style="font-size: 1.5em;">🎉</span>`;
+                }
+                authSection.style.display = 'none';
+                profileSection.style.display = 'block';
                     errorSection.style.display = 'none';
                 } else {
                     // Handle non-OK responses (e.g., 401 Unauthorized, 403 Forbidden)
