@@ -108,6 +108,21 @@
             margin-top: 30px;
             text-align: center;
         }
+        .strava-connect-link {
+            display: inline-block;
+            margin-top: 20px;
+            text-decoration: none;
+        }
+        .strava-connect-img {
+            height: 50px;
+            width: auto;
+            border: none;
+            vertical-align: middle;
+            cursor: pointer;
+        }
+        .strava-connect-img:hover {
+            opacity: 0.9;
+        }
     </style>
 </head>
 <body>
@@ -115,7 +130,9 @@
         <h1>Welcome to ZoneLens!</h1>
         <div id="auth-section">
             <p>Customize your Strava activity heart rate and power zones with ease. Connect your Strava account to get started.</p>
-            <button class="strava-button" onclick="window.location.href='/api/auth/strava'">Login with Strava</button>
+            <a href="/api/auth/strava" class="strava-connect-link">
+                <img src="{% static 'images/btn_strava_connect_with_orange_x2.png' %}" alt="Login with Strava" class="strava-connect-img">
+            </a>
         </div>
 
         <div id="profile" style="display: none;">
