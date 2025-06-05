@@ -34,6 +34,7 @@ dev = [
 	"requests-mock",
     "types-pytz",
     "types-requests",
+    "uv",
 ]
 
 [tool.hatch.build.targets.wheel]
