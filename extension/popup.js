@@ -1,14 +1,9 @@
-// Strava HR Zones Display popup script
-// This file can be used for logic related to the extension's popup window.
-// For now, it handles login and sync button clicks.
-
 // Helper function to get a cookie by name from a specific URL
 async function getCookie(name, url) {
-    return new Promise((resolve, reject) => {
+    return new Promise((resolve) => {
         if (typeof chrome !== "undefined" && chrome.cookies) {
             chrome.cookies.get({ url: url, name: name }, function(cookie) {
                 if (chrome.runtime.lastError) {
-                    // Log error but still resolve with null as the cookie might not exist
                     console.warn(`Error getting cookie '${name}' from ${url}: ${chrome.runtime.lastError.message}`);
                     resolve(null);
                 } else if (cookie) {
@@ -18,21 +13,10 @@ async function getCookie(name, url) {
                 }
             });
         } else {
-            // Fallback for environments where chrome.cookies is not available (e.g. testing outside extension)
-            // This fallback won't work for cross-origin httpOnly cookies in a real extension context.
-            console.warn("chrome.cookies API not available. Falling back to document.cookie (may not work for httpOnly cookies).");
-            let cookieValue = null;
-            if (document.cookie && document.cookie !== '') {
-                const cookies = document.cookie.split(';');
-                for (let i = 0; i < cookies.length; i++) {
-                    const cookie = cookies[i].trim();
-                    if (cookie.substring(0, name.length + 1) === (name + '=')) {
-                        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-                        break;
-                    }
-                }
-            }
-            resolve(cookieValue);
+            // This case should ideally not happen in a functioning extension popup.
+            // Indicates a more fundamental issue (e.g., script running outside extension context, or chrome object is broken).
+            console.error("chrome.cookies API is not available. Cannot retrieve cookies.");
+            resolve(null);
         }
     });
 }
@@ -52,7 +36,6 @@ document.addEventListener('DOMContentLoaded', function() {
     const BACKEND_ORIGIN = IS_PRODUCTION_BUILD ? PRODUCTION_DOMAIN : DEVELOPMENT_DOMAIN;
     const API_BASE_URL = `${BACKEND_ORIGIN}/api`;
 
-    // Function to update status message and apply class (moved to higher scope)
     function updateStatus(message, type) {
         statusMessage.textContent = message;
         statusMessage.className = ''; // Clear existing classes
@@ -67,10 +50,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    // --- HR Zones Check ---
     async function checkHrZonesAvailability() {
-        console.log('Checking HR zone availability from backend...');
-        // Use the dynamic BACKEND_ORIGIN for cookie retrieval
         try {
             const csrftoken = await getCookie('csrftoken', BACKEND_ORIGIN);
             if (!csrftoken) {
@@ -90,7 +70,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
             if (response.ok) {
                 const data = await response.json();
-                console.log('HR zone status from backend:', data);
                 return data.has_hr_zones;
             } else {
                 const errorData = await response.text();
@@ -117,41 +96,6 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }
     }
-    // --- End HR Zones Check ---
-
-    async function fetchAndStoreStravaHrZones() {
-        updateStatus('Attempting to fetch HR zones from Strava...', 'info');
-        try {
-            const csrftoken = await getCookie('csrftoken', BACKEND_ORIGIN);
-            if (!csrftoken) {
-                updateStatus('Error: CSRF token not found. Please log in.', 'error');
-                return false;
-            }
-
-            const response = await fetch(`${API_BASE_URL}/fetch-strava-hr-zones/`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRFToken': csrftoken
-                },
-                credentials: 'include'
-            });
-
-            if (response.ok) {
-                const data = await response.json();
-                updateStatus(data.message || 'HR zones fetched successfully from Strava.', 'success');
-                return true;
-            } else {
-                const errorData = await response.json().catch(() => ({ error: 'Failed to parse error from HR zone fetch.' }));
-                updateStatus(`Error fetching HR zones: ${errorData.error || response.statusText}`, 'error');
-                return false;
-            }
-        } catch (error) {
-            console.error('Error in fetchAndStoreStravaHrZones:', error);
-            updateStatus(`Request to fetch HR zones failed: ${error.message || error.toString()}`, 'error');
-            return false;
-        }
-    }
 
     if (viewMyHrZonesButton) {
         viewMyHrZonesButton.addEventListener('click', function() {
@@ -162,7 +106,6 @@ document.addEventListener('DOMContentLoaded', function() {
     if (loginButton) {
         loginButton.addEventListener('click', function() {
             statusMessage.textContent = ''; // Clear previous messages
-            // Redirect to your backend's Strava authorization initiate URL
             chrome.tabs.create({ url: `${API_BASE_URL}/auth/strava` });
         });
     }
@@ -174,11 +117,10 @@ document.addEventListener('DOMContentLoaded', function() {
             updateStatus('Syncing data from Strava...', 'info');
 
             try {
-                // Use dynamic BACKEND_ORIGIN for cookie retrieval
-                const csrftoken = await getCookie('csrftoken', BACKEND_ORIGIN); // Await the async call
+                const csrftoken = await getCookie('csrftoken', BACKEND_ORIGIN);
 
                 if (!csrftoken) {
-                    updateStatus('Error: CSRF token not found. Ensure you are logged in to the backend and cookie settings are correct.', 'error');
+                    updateStatus('Error: CSRF token not found. Ensure you are logged in.', 'error');
                     syncButton.disabled = false;
                     return;
                 }
@@ -202,11 +144,10 @@ document.addEventListener('DOMContentLoaded', function() {
                 });
 
                 if (response.ok) {
-                    const result = await response.json(); // Assuming backend sends JSON
+                    const result = await response.json();
                     updateStatus(`Sync successful: ${result.synced_activities_count} activities synced. Last sync: ${new Date(result.last_synced_timestamp).toLocaleString()}`, 'success');
-                    console.log('Sync successful:', result);
                 } else {
-                    const errorData = await response.text(); // Try to get error text
+                    const errorData = await response.text();
                     updateStatus(`Sync failed: ${response.status} ${response.statusText}. Check console.`, 'error');
                     console.error('Sync failed:', response.status, response.statusText, errorData);
                 }

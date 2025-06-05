@@ -1,12 +1,6 @@
-// Content script for Strava HR Zones Display
-console.log("Strava HR Zones Display content script v2 loaded.");
-
 const MONTHLY_SUMMARY_ID = 'hr-zones-monthly-summary-container';
-const WEEKLY_SUMMARY_CLASS = 'injected-weekly-hr-summary'; // Class for easy removal
+const WEEKLY_SUMMARY_CLASS = 'injected-weekly-hr-summary';
 
-// Placeholder for User ID - replace with actual user ID retrieval logic
-// const USER_ID = 1; // No longer sending hardcoded user_id for this view
-// Configuration for API endpoints
 const PRODUCTION_DOMAIN = 'https://strava-zones.com';
 const DEVELOPMENT_DOMAIN = 'https://localhost:8000';
 const IS_PRODUCTION_BUILD = false; // Set to true for production builds
@@ -29,7 +23,6 @@ const monthNumberMap = {
 };
 
 async function fetchActivityData(year, monthShortName) {
-    const monthFullName = monthMap[monthShortName] || monthShortName; // Use full name if mapped
     const monthNum = monthNumberMap[monthShortName];
 
     if (!monthNum) {
@@ -37,11 +30,9 @@ async function fetchActivityData(year, monthShortName) {
         return null;
     }
 
-    // Adjust API endpoint as per your backend design
     // Now targets /api/zones/ and expects year & month as query params.
     // User identification is expected to be handled by the backend via session.
     const apiUrl = `${API_BASE_URL}/zones/?year=${year}&month=${monthNum}`;
-    console.log(`Fetching data from: ${apiUrl}`);
 
     try {
         const response = await fetch(apiUrl, {
@@ -49,7 +40,6 @@ async function fetchActivityData(year, monthShortName) {
             credentials: 'include', // Send cookies (like session cookies) with the request
             headers: {
                 'Content-Type': 'application/json',
-                // Add any other headers your backend might expect, like X-CSRFToken if needed for non-GET
             }
         });
         if (!response.ok) {
@@ -58,23 +48,16 @@ async function fetchActivityData(year, monthShortName) {
             throw new Error(`HTTP error ${response.status}: ${errorText}`);
         }
         const data = await response.json();
-        console.log("Data fetched successfully:", data);
-        // Ensure data has displayName, zoneDefinitions, totalSummary, weeklySummaries
-        // The backend should ideally provide 'displayName' and 'zoneDefinitions'
-        // If not, we might need to reconstruct them or make them static here.
-        // For now, assuming backend provides: year, displayName, totalSummary, weeklySummaries, zoneDefinitions
         return data;
     } catch (error) {
         console.error('Failed to fetch activity data:', error);
-        return null; // Or throw error to be caught by caller for UI update
+        return null;
     }
 }
 
 function formatSecondsToHms(totalSeconds) {
     const hours = Math.floor(totalSeconds / 3600);
     const minutes = Math.floor((totalSeconds % 3600) / 60);
-    // const seconds = totalSeconds % 60;
-    // return `${hours}h ${minutes}m ${seconds}s`;
     if (hours > 0) return `${hours}h ${minutes}m`;
     return `${minutes}m`;
 }
@@ -84,7 +67,7 @@ function renderMonthlySummary(monthKey, data) {
     if (!summaryContainer) {
         summaryContainer = document.createElement('div');
         summaryContainer.id = MONTHLY_SUMMARY_ID;
-        document.body.prepend(summaryContainer); // Prepend to body for now
+        document.body.prepend(summaryContainer);
     }
 
     const totalMonthSeconds = Object.values(data.totalSummary).reduce((sum, time) => sum + time, 0);
@@ -111,10 +94,10 @@ function renderMonthlySummary(monthKey, data) {
         const numB = parseInt(b.replace('zone', ''), 10);
         return numA - numB;
     });
-    const orderedSimplifiedZoneKeys = simplifiedZoneKeys.reverse(); // e.g., ['zone5', 'zone4', ..., 'zone1']
+    const orderedSimplifiedZoneKeys = simplifiedZoneKeys.reverse();
 
-    for (const simplifiedZoneKey of orderedSimplifiedZoneKeys) { // e.g., 'zone5', 'zone4'
-        const zoneNumberStr = simplifiedZoneKey.replace('zone', ''); // e.g., '5', '4'
+    for (const simplifiedZoneKey of orderedSimplifiedZoneKeys) {
+        const zoneNumberStr = simplifiedZoneKey.replace('zone', '');
 
         const actualUserDefinedName = data.zoneDefinitions[simplifiedZoneKey];
         const timeSeconds = actualUserDefinedName ? (data.totalSummary[actualUserDefinedName] || 0) : 0;
@@ -139,13 +122,7 @@ function renderMonthlySummary(monthKey, data) {
     console.log(`Monthly summary for ${monthKey} rendered.`);
 }
 
-function renderWeeklySummaries(monthKey, data) {
-    console.log(`Attempting to render weekly summaries for ${monthKey}.`);
-
-    // **IMPORTANT**: This selector needs to be updated based on Strava's actual calendar structure.
-    // Use Chrome DevTools to inspect the calendar and find the correct selector for week rows.
-    // Examples: 'div.date-grid > div.week', 'table#calendar-table tbody tr',
-    // '.rc-MonthWrapper .rc-Week'
+function renderWeeklySummaries(data) {
     const weekRowSelector = 'table.month-calendar.marginless tbody tr';
     const weekRows = document.querySelectorAll(weekRowSelector);
 
@@ -166,7 +143,7 @@ function renderWeeklySummaries(monthKey, data) {
         const numB = parseInt(b.replace('zone', ''), 10);
         return numA - numB;
     });
-    const orderedSimplifiedZoneKeys = simplifiedZoneKeys.reverse(); // e.g., ['zone5', 'zone4', ..., 'zone1']
+    const orderedSimplifiedZoneKeys = simplifiedZoneKeys.reverse();
 
     weekRows.forEach((row, index) => {
         if (data.weeklySummaries && data.weeklySummaries[index] && data.weeklySummaries[index].zone_times_seconds) {
@@ -208,32 +185,25 @@ function renderWeeklySummaries(monthKey, data) {
 
                 // Create a new table cell (td) to hold our summary panel
                 const summaryCell = document.createElement('td');
-                summaryCell.className = 'strava-zones-weekly-summary-cell'; // For potential styling
-                summaryCell.style.verticalAlign = 'top'; // Align panel to the top of the cell
-                summaryCell.style.padding = '2px'; // Add a little padding
+                summaryCell.className = 'strava-zones-weekly-summary-cell';
+                summaryCell.style.verticalAlign = 'top';
+                summaryCell.style.padding = '2px';
 
                 summaryCell.appendChild(panelContainer);
                 row.appendChild(summaryCell); // Add the new cell to the row (tr)
             }
-        } else {
-            // console.log(`No weekly data for week index ${index} or week row not found`);
         }
     });
-    console.log(`Processed ${weekRows.length} potential week rows for weekly summaries.`);
 }
 
 function clearAllInjectedUI() {
     const monthlyElement = document.getElementById(MONTHLY_SUMMARY_ID);
     if (monthlyElement) {
         monthlyElement.remove();
-        console.log("Monthly summary element removed.");
     }
 
     const weeklyElements = document.querySelectorAll('.' + WEEKLY_SUMMARY_CLASS);
     weeklyElements.forEach(el => el.remove());
-    if (weeklyElements.length > 0) {
-        console.log(`${weeklyElements.length} weekly summary elements removed.`);
-    }
 }
 
 function initHrZoneDisplay() {
@@ -245,8 +215,7 @@ function initHrZoneDisplay() {
 
     // Simple check for 3-letter month abbreviations
     if (monthKey && /^[A-Za-z]{3}$/.test(monthKey)) {
-        console.log(`Attempting to display HR Zones for month: ${monthKey}`);
-        clearAllInjectedUI(); // Use the updated clearing function
+        clearAllInjectedUI();
 
         let yearToUse = null;
 
@@ -258,18 +227,16 @@ function initHrZoneDisplay() {
             const yearStr = pathParts[calendarKeywordIndex + 1];
             if (/^\d{4}$/.test(yearStr)) {
                 yearToUse = parseInt(yearStr, 10);
-                console.log(`Year extracted from path: ${yearToUse}`);
             }
         }
 
         // 2. If not in path, try from DOM element
         if (!yearToUse) {
-            const yearElement = document.querySelector('.selected-month .year'); // Selector from original snippet
+            const yearElement = document.querySelector('.selected-month .year');
             if (yearElement && yearElement.textContent) {
                 const parsedYear = parseInt(yearElement.textContent.trim(), 10);
                 if (!isNaN(parsedYear)) {
                     yearToUse = parsedYear;
-                    console.log(`Year extracted from DOM: ${yearToUse}`);
                 }
             }
         }
@@ -277,10 +244,7 @@ function initHrZoneDisplay() {
         // 3. If still no year, default to current year
         if (!yearToUse) {
             yearToUse = new Date().getFullYear();
-            console.log(`Year defaulted to current system year: ${yearToUse}`);
         }
-
-        console.log(`Using year: ${yearToUse} for month: ${monthKey}`);
 
         fetchActivityData(yearToUse, monthKey).then(data => {
             // Check if monthly_summary and its zone_times_seconds exist and are not empty
@@ -293,7 +257,7 @@ function initHrZoneDisplay() {
                     weeklySummaries: data.weekly_summaries || []
                 };
                 renderMonthlySummary(monthKey, displayData);
-                renderWeeklySummaries(monthKey, displayData);
+                renderWeeklySummaries(displayData);
             } else {
                 console.warn(`No valid data received for ${monthMap[monthKey] || monthKey}, ${yearToUse} or error in fetching. Monthly summary was:`, data ? data.monthly_summary : 'no data');
                 // Display a message indicating no data or an error
@@ -307,7 +271,6 @@ function initHrZoneDisplay() {
         });
 
     } else {
-        console.log("Not on a specific month view, clearing summary.", monthKey);
         clearAllInjectedUI();
     }
 }
@@ -324,8 +287,3 @@ window.addEventListener('hashchange', initHrZoneDisplay);
 
 // Strava might also use popstate for navigation in some cases
 window.addEventListener('popstate', initHrZoneDisplay);
-
-// More robust SPA navigation detection might be needed if hashchange/popstate are not enough.
-// Consider MutationObserver on a stable part of the page or title changes.
-
-console.log("Strava HR Zones Display event listeners attached.");

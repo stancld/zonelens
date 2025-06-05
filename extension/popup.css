@@ -23,8 +23,7 @@ label {
   font-size: 13px;
 }
 
-input[type="date"],
-input[type="text"] {
+input[type="date"] {
   width: calc(100% - 18px); /* Full width minus padding */
   padding: 8px;
   margin-bottom: 15px;
