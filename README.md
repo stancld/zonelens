@@ -11,6 +11,9 @@
   <a href="https://github.com/stancld/strava-zones/actions/workflows/backend-release-build.yml">
     <img src="https://github.com/stancld/strava-zones/actions/workflows/backend-release-build.yml/badge.svg" alt="Backend CI Status"/>
   </a>
+  <a href="https://github.com/stancld/strava-zones/actions/workflows/extension-release-build.yml">
+    <img src="https://github.com/stancld/strava-zones/actions/workflows/extension-release-build.yml/badge.svg" alt="Extension CI Status"/>
+  </a>
   <a href="https://codecov.io/github/stancld/strava-zones">
     <img src="https://codecov.io/github/stancld/strava-zones/graph/badge.svg?token=LNOJHFDBUA" alt="Code Coverage"/>
   </a>

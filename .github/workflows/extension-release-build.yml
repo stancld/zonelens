@@ -1,4 +1,4 @@
-name: Extension Release Build and Package
+name: Extension build
 
 on:
   push:
