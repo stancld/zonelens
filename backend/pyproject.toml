@@ -9,7 +9,7 @@ description = "Backend API for Strava HR Zone Calendar Visualization extension"
 authors = [
 	{name = "Daniel Stancl", email = "daniel.stancl@gmail.com"},
 ]
-requires-python = ">=3.12"
+requires-python = ">=3.13"
 dependencies = [
     "cryptography",
     "django",
@@ -120,7 +120,7 @@ max-complexity = 12
 indent-style = "tab"
 
 [tool.mypy]
-python_version = "3.12"
+python_version = "3.13"
 warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = true
