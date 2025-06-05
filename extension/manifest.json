@@ -4,9 +4,6 @@
   "version": "0.2.2",
   "description": "Enhances your Strava experience by visualizing your Heart Rate (HR) zone data directly on your Training Calendar.",
   "permissions": [
-    "activeTab",
-    "storage",
-    "scripting",
     "cookies"
   ],
   "host_permissions": [
