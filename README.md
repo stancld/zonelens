@@ -14,7 +14,7 @@
   <a href="https://codecov.io/github/stancld/strava-zones">
     <img src="https://codecov.io/github/stancld/strava-zones/graph/badge.svg?token=LNOJHFDBUA" alt="Code Coverage"/>
   </a>
-  <img src="https://img.shields.io/badge/python-3.12-blue" alt="Python 3.12"/>
+  <img src="https://img.shields.io/badge/python-3.13-blue" alt="Python 3.13"/>
   <img src="https://img.shields.io/badge/Version-v0.2.2-orange" alt="Version v0.2.2"/>
   <a href="LICENSE">
     <img src="https://img.shields.io/badge/license-MIT-green" alt="License: MIT"/>
