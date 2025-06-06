@@ -1,3 +1,25 @@
+# MIT License
+#
+# Copyright (c) 2025 Dan Stancl
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 from __future__ import annotations
 
 import datetime as dt
@@ -62,30 +84,26 @@ class StravaApiClient:
 		)
 
 	def refresh_strava_token(self) -> bool:
-		"""Refreshes an expired Strava access token for the given user.
+		"""Refresh an expired Strava access token for the given user.
 
 		Returns
 		-------
-			True if the token was successfully refreshed and saved, False otherwise.
+		     True if the token was successfully refreshed and saved, False otherwise.
 		"""
 		if not self.strava_user.refresh_token:
 			logger.error(f"User {self.strava_user.strava_id} has no refresh token for Strava.")
 			return False
 
 		try:
-			logger.info(
-				f"Attempting to refresh Strava token for user {self.strava_user.strava_id}"
-			)
 			response = requests.post(
 				STRAVA_TOKEN_URL,
 				data=self._generate_refresh_token_payload(self.strava_user.refresh_token),
 			)
 			response.raise_for_status()
-			token_data = response.json()
 
-			self._update_strava_user_tokens(self.strava_user, token_data)
+			self._update_strava_user_tokens(self.strava_user, response.json())
 			logger.info(
-				f"Successfully refreshed Strava token for user {self.strava_user.strava_id}"
+				f"Successfully refreshed Strava token for user {self.strava_user.strava_id!r}"
 			)
 			return True
 		except requests.exceptions.HTTPError as e:
@@ -109,16 +127,18 @@ class StravaApiClient:
 		before: int | None = None,
 		after: int | None = None,
 	) -> list[dict[str, Any]] | None:
-		"""Fetches a list of activities for the authenticated Strava user.
+		"""Fetch a list of activities for the authenticated Strava user.
 
 		Additional parameters
 		---------------------
-			before: Epoch timestamp to filter activities before this time.
-			after: Epoch timestamp to filter activities after this time.
+		before
+		    Epoch timestamp to filter activities before this time.
+		after
+		    Epoch timestamp to filter activities after this time.
 
 		Returns
 		-------
-			A list of activity data as dictionaries, or None if an error occurs.
+		A list of activity data as dictionaries, or None if an error occurs.
 		"""
 		params: dict[str, int | str] = {"page": page, "per_page": per_page}
 		if before is not None:
@@ -176,11 +196,11 @@ class StravaApiClient:
 		return None
 
 	def fetch_athlete_zones(self) -> dict[str, dict[str, Any]] | None:
-		"""Fetches the athlete's defined zones (HR, Power) from Strava.
+		"""Fetch the athlete's defined zones (HR, Power) from Strava.
 
 		Returns
 		-------
-			A dict of zone data as dictionaries, or None if an error occurs.
+		    A dict of zone data as dictionaries, or None if an error occurs.
 		"""
 		logger.info(f"Fetching athlete zones for user {self.strava_user.strava_id}")
 		if not self.strava_user.access_token:
@@ -244,17 +264,19 @@ class StravaApiClient:
 		before: int | None = None,
 		after: int | None = None,
 	) -> list[dict[str, Any]] | None:
-		"""Fetches all activities for the authenticated Strava user by handling pagination.
+		"""Fetch all activities for the authenticated Strava user by handling pagination.
 
-		Additional parameters
-		---------------------
-			before: Epoch timestamp to filter activities before this time.
-			after: Epoch timestamp to filter activities after this time.
+		Parameters
+		----------
+		before
+		    Epoch timestamp to filter activities before this time.
+		after
+		    Epoch timestamp to filter activities after this time.
 
 		Returns
 		-------
-			A list of all activity data as dictionaries, or None if a persistent error occurs.
-			If some activities are fetched before an error, those will be returned.
+		    A list of all activity data as dictionaries, or None if a persistent error occurs.
+		    If some activities are fetched before an error, those will be returned.
 		"""
 		all_activities: list[dict[str, Any]] = []
 		page = 1
@@ -269,10 +291,7 @@ class StravaApiClient:
 				f"(before={before}, after={after})"
 			)
 			activities_chunk = self.fetch_strava_activities(
-				page=page,
-				per_page=STRAVA_API_MAX_PER_PAGE,
-				before=before,
-				after=after,
+				page=page, per_page=STRAVA_API_MAX_PER_PAGE, before=before, after=after
 			)
 
 			if activities_chunk is None:
@@ -293,20 +312,17 @@ class StravaApiClient:
 				break
 
 			all_activities.extend(activities_chunk)
-			logger.debug(
-				f"Page {page}: {len(activities_chunk)} acts. Total: {len(all_activities)}."
-			)
 
 			page += 1
 
 		return all_activities
 
 	def fetch_activity_details(self, activity_id: int) -> dict[str, Any] | None:
-		"""Fetches details for a single activity from the Strava API.
+		"""Fetch details for a single activity from the Strava API.
 
 		Returns
 		-------
-		    A dictionary containing the activity data, or None if an error occurs.
+		A dictionary containing the activity data, or None if an error occurs.
 		"""
 		try:
 			response = self.get(
@@ -326,19 +342,19 @@ class StravaApiClient:
 		self, activity_id: int, attempt_refresh: bool = True
 	) -> dict[str, Any] | None:
 		"""
-		Fetches specified streams (heartrate, time) for a given activity from the Strava API.
+		Fetch specified streams (heartrate, time) for a given activity from the Strava API.
 
-		Additional parameters
-		---------------------
-			activity_id
-				The ID of the activity for which to fetch streams.
-			attempt_refresh
-				If True, try to refresh the token on a 401 error.
+		Parameters
+		----------
+		activity_id
+		        The ID of the activity for which to fetch streams.
+		attempt_refresh
+		        If True, try to refresh the token on a 401 error.
 
 		Returns
 		-------
-			A dictionary containing the stream data (e.g., {'time': {...}, 'heartrate': {...}})
-			or None if an error occurs or streams are not available.
+		        A dictionary containing the stream data (e.g., {'time': {...}, 'heartrate': {...}})
+		        or None if an error occurs or streams are not available.
 		"""
 		try:
 			response = self.get(
@@ -347,12 +363,7 @@ class StravaApiClient:
 				params={"keys": "heartrate,time", "key_by_type": "true"},
 			)
 			response.raise_for_status()  # Raise HTTPError for bad responses (4XX or 5XX)
-			streams_data = response.json()
-			logger.debug(
-				f"Successfully fetched streams for activity {activity_id}. "
-				f"Streams received: {list(streams_data.keys())}"
-			)
-			return streams_data
+			return response.json()
 		except requests.exceptions.HTTPError as e:
 			if e.response is not None and e.response.status_code == 401 and attempt_refresh:
 				logger.warning(
