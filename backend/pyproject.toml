@@ -83,7 +83,6 @@ ignore = [
     "E114",  # Indentation is not a multiple of 4 (comment)
     "ERA001",  # flaky
     "G004",
-    "PLC0206",  # Extracting value from dictionary without calling `.items()` (shady)
     "PLR0402",  # Use `from {module} import {name}` in lieu of alias (can be in clash with our import conventions)
     "PLR0904",  # Too many public methods (more than 20)
     "PLR0912",  # Cyclomatic complexity (already checked by mccabe)
