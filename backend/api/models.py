@@ -1,3 +1,25 @@
+# MIT License
+#
+# Copyright (c) 2025 Dan Stancl
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 from __future__ import annotations
 
 import uuid
@@ -17,19 +39,18 @@ logger = get_logger(__name__)
 
 
 class StravaUser(models.Model):
-	"""Represents a user authenticated via Strava."""
+	"""Represent a user authenticated via Strava."""
 
 	user = models.OneToOneField(
 		settings.AUTH_USER_MODEL,
 		on_delete=models.CASCADE,
 		related_name="strava_profile",
 		help_text="Associated Django User",
-		null=True,  # TODO: Generate new migration and enforce not-null
+		null=True,
 	)
 	strava_id = models.BigIntegerField(
 		primary_key=True, unique=True, help_text="Strava Athlete ID"
 	)
-	# Store encrypted tokens as text. Use properties for easy access.
 	_access_token = models.TextField(
 		default="", blank=True, help_text="Encrypted Strava access token"
 	)
@@ -88,7 +109,7 @@ class CustomZonesConfig(models.Model):
 	updated_at = models.DateTimeField(auto_now=True)
 
 	class Meta:
-		unique_together = ("user", "activity_type")  # Ensure one config type per user
+		unique_together = ("user", "activity_type")
 
 	def __str__(self):
 		return f"Zone Config for {self.user.strava_id} - {self.get_activity_type_display()}"
@@ -110,7 +131,7 @@ class HeartRateZone(models.Model):
 	updated_at = models.DateTimeField(auto_now=True)
 
 	class Meta:
-		unique_together = ("config", "name")  # Zone names should be unique within a config
+		unique_together = ("config", "name")
 		ordering: ClassVar = ["config", "order", "min_hr"]
 
 	def __str__(self) -> str:
@@ -123,7 +144,7 @@ class HeartRateZone(models.Model):
 
 
 class ZoneSummary(models.Model):
-	"""Stores aggregated time-in-zone summaries for specific periods."""
+	"""Store aggregated time-in-zone summaries for specific periods."""
 
 	class PeriodType(models.TextChoices):
 		WEEKLY = "WEEKLY", "Weekly"
@@ -157,7 +178,7 @@ class ZoneSummary(models.Model):
 		period_type: PeriodType,
 		year: int,
 		period_index: int | None = None,
-		current_month_view: int | None = None,  # Month being viewed, for context
+		current_month_view: int | None = None,
 	) -> tuple[ZoneSummary | None, bool]:
 		"""Tries to fetch a ZoneSummary.
 
@@ -168,59 +189,39 @@ class ZoneSummary(models.Model):
 			period_type=period_type,
 			year=year,
 			period_index=period_index,
-			defaults={"zone_times_seconds": {}},  # Default to empty if we need to create
+			defaults={"zone_times_seconds": {}},
 		)
 
-		# Always determine activity filters based on current parameters
-		activity_filters = {"user": user_profile, "activity_date__year": year}
-		if period_type == ZoneSummary.PeriodType.MONTHLY:
-			activity_filters["activity_date__month"] = period_index
-		elif period_type == ZoneSummary.PeriodType.WEEKLY:
-			activity_filters["activity_date__week"] = period_index
-			if current_month_view:  # Apply month context if provided for weekly
-				activity_filters["activity_date__month"] = current_month_view
+		activity_filters = cls._construct_activity_filters(
+			user_profile,
+			year,
+			period_type,
+			period_index,
+			current_month_view,
+		)
 
 		try:
 			default_config = CustomZonesConfig.objects.get(
 				user=user_profile, activity_type=ActivityType.DEFAULT
 			)
-			hr_zone_order_subquery = HeartRateZone.objects.filter(
-				config=default_config, name=OuterRef("zone_name")
-			).values("order")[:1]
-
-			aggregated_times = (
-				ActivityZoneTimes.objects.filter(**activity_filters)
-				.values("zone_name")
-				.annotate(
-					total_duration=Sum("duration_seconds"),
-					zone_order=Subquery(hr_zone_order_subquery),
-				)
-				.order_by("zone_order", "zone_name")
-			)
 		except CustomZonesConfig.DoesNotExist as e:
 			raise ValueError("Default CustomZonesConfig not found for user") from e
 
-		calculated_zone_times = OrderedDict(
-			{
-				item["zone_name"]: item["total_duration"]
-				for item in aggregated_times
-				if item["total_duration"]
-			}
-		)
+		time_in_zones = cls._calculate_aggregated_time_in_zones(activity_filters, default_config)
 
 		# Update and save only if newly created or if calculated times differ from stored times
-		if created or summary.zone_times_seconds != calculated_zone_times:
-			if not calculated_zone_times and not created:
+		if created or summary.zone_times_seconds != time_in_zones:
+			if not time_in_zones and not created:
 				# If calculation results in empty and it wasn't just created
 				# (meaning it had data before)
 				# and we now have no data for this specific context, ensure we store empty.
 				pass  # Handled by assignment below
 
-			summary.zone_times_seconds = calculated_zone_times
+			summary.zone_times_seconds = time_in_zones
 			summary.save()
 			logger.info(
 				f"ZoneSummary for {user_profile.strava_id}, {period_type}, {year}-{period_index} "
-				f"(context: {current_month_view}) updated/created. Data: {calculated_zone_times}"
+				f"(context: {current_month_view}) updated/created. Data: {time_in_zones}"
 			)
 		elif not created:
 			logger.info(
@@ -231,9 +232,59 @@ class ZoneSummary(models.Model):
 
 		return summary, created
 
+	@staticmethod
+	def _calculate_aggregated_time_in_zones(
+		activity_filters: dict[str, int | StravaUser], default_config: CustomZonesConfig
+	) -> OrderedDict[str, int]:
+		"""Calculate aggregated time in heart rate zones for a given set of activities.
+
+		Returns
+		-------
+		time_in_zones
+			Ordered dictionary of zone names and their aggregated duration in seconds.
+		"""
+		hr_zone_order_subquery = HeartRateZone.objects.filter(
+			config=default_config, name=OuterRef("zone_name")
+		).values("order")[:1]
+
+		aggregated_times = (
+			ActivityZoneTimes.objects.filter(**activity_filters)
+			.values("zone_name")
+			.annotate(
+				total_duration=Sum("duration_seconds"),
+				zone_order=Subquery(hr_zone_order_subquery),
+			)
+			.order_by("zone_order", "zone_name")
+		)
+
+		return OrderedDict(
+			{
+				item["zone_name"]: item["total_duration"]
+				for item in aggregated_times
+				if item["total_duration"]
+			}
+		)
+
+	@staticmethod
+	def _construct_activity_filters(
+		user_profile: StravaUser,
+		year: int,
+		period_type: PeriodType,
+		period_index: int | None,
+		current_month_view: int | None = None,
+	) -> dict[str, int | StravaUser]:
+		activity_filters = {"user": user_profile, "activity_date__year": year}
+		if period_type == ZoneSummary.PeriodType.MONTHLY:
+			activity_filters["activity_date__month"] = period_index
+		elif period_type == ZoneSummary.PeriodType.WEEKLY:
+			activity_filters["activity_date__week"] = period_index
+			if current_month_view:  # Apply month context if provided for weekly
+				activity_filters["activity_date__month"] = current_month_view
+		return activity_filters  # type: ignore[return-value]
+
 
 class ActivityZoneTimes(models.Model):
-	"""Stores time spent in each custom heart rate zone for a single activity."""
+	"""Store time spent in each custom heart rate zone for a single activity."""
 
 	id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
 	user = models.ForeignKey(
