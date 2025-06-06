@@ -952,6 +952,104 @@ class HRProcessingTests(APITestCase):
 		expected["Zone 1"] = 20  # Only the first segment should be counted
 		self.assertDictEqual(result, expected)
 
+	def test_parse_activity_streams_stream_not_dict(self):
+		"""Test parsing when a stream type (e.g., 'time') maps to a non-dictionary."""
+		streams_data = {
+			"time": "not_a_dict",
+			"heartrate": {
+				"data": [150, 151],
+				"type": "heartrate",
+				"series_type": "time",
+				"original_size": 2,
+				"resolution": "high",
+			},
+		}
+		time_data, heartrate_data = parse_activity_streams(streams_data)
+		self.assertIsNone(time_data)
+		# Ensure heartrate_data is still parsed correctly if it's valid
+		self.assertEqual(heartrate_data, [150, 151])
+
+	def test_parse_activity_streams_stream_data_not_list(self):
+		"""Test parsing when a stream's 'data' key maps to a non-list."""
+		streams_data = {
+			"time": {
+				"data": "not_a_list",
+				"type": "time",
+				"series_type": "time",
+				"original_size": 0,
+				"resolution": "high",
+			},
+			"heartrate": {
+				"data": [150, 151],
+				"type": "heartrate",
+				"series_type": "time",
+				"original_size": 2,
+				"resolution": "high",
+			},
+		}
+		time_data, heartrate_data = parse_activity_streams(streams_data)
+		self.assertIsNone(time_data)
+		self.assertEqual(heartrate_data, [150, 151])
+
+	@patch("api.hr_processing.logger")
+	def test_determine_hr_zone_db_error_on_fetch(self, mock_logger):
+		"""Test determine_hr_zone when a DB error occurs fetching zones."""
+		mock_zones_config = MagicMock(spec=CustomZonesConfig)
+		mock_zones_config.user_id = self.strava_user.strava_id
+		mock_zones_config.activity_type = "TestActivityDBError"
+		# Configure the mock to raise an exception when .order_by() is called
+		mock_zones_config.zones_definition.order_by.side_effect = Exception("Simulated DB error")
+
+		result = determine_hr_zone(150, mock_zones_config)
+		self.assertIsNone(result)
+		mock_logger.error.assert_called_once()
+		err_msg = (
+			f"Error accessing or sorting zones for user {self.strava_user.strava_id}, "
+			"activity type TestActivityDBError. Error: Simulated DB error"
+		)
+		self.assertIn(err_msg, mock_logger.error.call_args[0][0])
+
+	@patch("api.hr_processing.logger")
+	def test_determine_hr_zone_all_zones_min_greater_than_max_hr(self, mock_logger):
+		"""Test determine_hr_zone when all zones have min_hr > max_hr."""
+		config_inverted = CustomZonesConfig.objects.create(
+			user=self.strava_user, activity_type="InvertedHRTest"
+		)
+		HeartRateZone.objects.create(
+			config=config_inverted, name="Zone X", min_hr=150, max_hr=140, order=1
+		)
+		HeartRateZone.objects.create(
+			config=config_inverted, name="Zone Y", min_hr=170, max_hr=160, order=2
+		)
+
+		result = determine_hr_zone(145, config_inverted)
+		self.assertIsNone(result)
+
+	@patch("api.hr_processing.logger")
+	def test_calculate_time_in_zones_db_error_on_config_init(self, mock_logger):
+		"""Test calculate_time_in_zones when a DB error occurs initializing zone names from config."""  # noqa: E501
+		mock_zones_config = MagicMock(spec=CustomZonesConfig)
+		mock_zones_config.id = self.zones_config.id  # For logging message
+		# Mock the zones_definition relation to raise an exception when .all().order_by() is called
+		mock_zones_config.zones_definition.all.return_value.order_by.side_effect = Exception(
+			"DB error on config init"
+		)
+
+		time_data = [0, 10, 20, 30]
+		hr_data = [100, 110, 120, 130]
+		result = calculate_time_in_zones(time_data, hr_data, mock_zones_config)
+
+		# Should default to only OUTSIDE_ZONES_KEY and sum all time there
+		self.assertEqual(len(result), 1)
+		self.assertIn(OUTSIDE_ZONES_KEY, result)
+		self.assertEqual(result[OUTSIDE_ZONES_KEY], 30)  # Total duration 0 to 30
+		mock_logger.error.assert_called_once()
+		err_msg = (
+			f"Error accessing zone definitions for config {self.zones_config.id}: DB error on config init. "  # noqa: E501
+			"Proceeding as if no zones were defined."
+		)
+		self.assertIn(err_msg, mock_logger.error.call_args[0][0])
+
 
 class StravaHRWorkerTests(TestCase):
 	def setUp(self) -> None:
@@ -1698,7 +1796,7 @@ class UserHRZonesDisplayViewTests(TestCase):
 		Additional parameters
 		---------------------
 		configs_data_list
-			List of tuples: (config_idx, config_id, activity_type_value, zones_list_of_dicts)
+		        List of tuples: (config_idx, config_id, activity_type_value, zones_list_of_dicts)
 		"""
 		form_data = {"action": action}
 		if configs_data_list:
