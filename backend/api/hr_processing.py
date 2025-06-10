@@ -1,3 +1,25 @@
+# MIT License
+#
+# Copyright (c) 2025 Dan Stancl
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
@@ -22,47 +44,20 @@ def parse_activity_streams(
 	streams_data
 	    A dictionary representing the JSON response from the Strava API's
 	    getLoggedInAthleteActivityStreams endpoint, keyed by stream type.
-	    Expected to contain 'time' and 'heartrate' streams.
 
 	Returns
 	-------
-	    A tuple (time_data, heartrate_data).
-	    - time_data: A list of integers representing the time series in seconds,
-	                 or None if not found or invalid.
-	    - heartrate_data: A list of integers representing the heart rate series in bpm,
-	                      or None if not found or invalid.
+	time_data
+		Time series in seconds, or None if not found or invalid.
+	heartrate_data
+		Heart rate series in bpm, or None if not found or invalid.
 	"""
 	if not streams_data:
 		logger.warning("No stream data provided to parse.")
 		return None, None
 
-	time_stream = streams_data.get("time")
-	heartrate_stream = streams_data.get("heartrate")
-
-	time_data: list[int] | None = None
-	heartrate_data: list[int] | None = None
-
-	if isinstance(time_stream, dict) and isinstance(time_stream.get("data"), list):
-		time_data = time_stream["data"]
-		if not time_data:
-			logger.warning("Time stream data array is empty.")
-			time_data = None
-		elif not all(isinstance(t, int) for t in time_data):
-			logger.warning("Time stream data contains non-integer values.")
-			time_data = None
-	else:
-		logger.warning("Time stream not found or data is not a list.")
-
-	if isinstance(heartrate_stream, dict) and isinstance(heartrate_stream.get("data"), list):
-		heartrate_data = heartrate_stream["data"]
-		if not heartrate_data:
-			logger.warning("Heartrate stream data array is empty.")
-			heartrate_data = None
-		elif not all(isinstance(hr, int) for hr in heartrate_data):
-			logger.warning("Heartrate stream data contains non-integer values.")
-			heartrate_data = None
-	else:
-		logger.warning("Heartrate stream not found or data is not a list.")
+	time_data = _parse_activity_stream(streams_data, "time")
+	heartrate_data = _parse_activity_stream(streams_data, "heartrate")
 
 	if time_data and heartrate_data and len(time_data) != len(heartrate_data):
 		logger.warning(
@@ -73,22 +68,34 @@ def parse_activity_streams(
 	return time_data, heartrate_data
 
 
+def _parse_activity_stream(data_streams: dict[str, Any], stream_type: str) -> list[int] | None:
+	stream = data_streams.get(stream_type)
+	if isinstance(stream, dict) and isinstance(stream.get("data"), list):
+		if not (data := stream["data"]):
+			logger.warning(f"{stream_type.capitalize()} stream data array is empty.")
+			return None
+		if not all(isinstance(t, int) for t in data):
+			logger.warning(f"{stream_type.capitalize()} stream data contains non-integer values.")
+			return None
+		return data
+
+	logger.warning(f"{stream_type.capitalize()} stream not found or data is not a list.")
+	return None
+
+
 def determine_hr_zone(hr_value: int, zones_config: CustomZonesConfig | None) -> str | None:
 	"""Determine the custom heart rate zone for a given heart rate value.
 
 	Returns
 	-------
-	The name of the heart rate zone (e.g., "Zone 1", "Zone 2") or None
-	if the hr_value does not fall into any defined zone.
-	Assumes zones are ordered by name or that iteration order is acceptable.
-	If zones can overlap, the first matching zone encountered will be returned.
+	The name of the heart rate zone (e.g., "Zone 1", "Zone 2")
+	or None if the hr_value does not fall into any defined zone.
 	"""
 	if not zones_config:
 		logger.warning("determine_hr_zone called with no zones_config object.")
 		return None
 
 	try:
-		# Fetch all related HeartRateZone objects, ordered by min_hr
 		all_zones = list(zones_config.zones_definition.order_by("min_hr"))
 	except Exception as e:
 		err_msg = (
@@ -99,7 +106,7 @@ def determine_hr_zone(hr_value: int, zones_config: CustomZonesConfig | None) -> 
 		return None
 
 	if not all_zones:
-		logger.debug(
+		logger.warning(
 			f"No heart rate zones defined for user {zones_config.user_id}, "
 			f"activity type {zones_config.activity_type}."
 		)
@@ -113,13 +120,8 @@ def determine_hr_zone(hr_value: int, zones_config: CustomZonesConfig | None) -> 
 		if zone.min_hr <= hr_value <= zone.max_hr:
 			return zone.name
 
-	defined_zones_str = ", ".join([f"{z.name}: {z.min_hr}-{z.max_hr}" for z in all_zones])
-	debug_msg = (
-		f"HR value {hr_value} is out of defined zones for user {zones_config.user_id}, "
-		f"activity type {zones_config.activity_type}. Defined zones: [{defined_zones_str}]"
-	)
-	logger.debug(debug_msg)
-	return None  # HR value is outside all defined zones
+	# HR value is outside all defined zones
+	return None
 
 
 def calculate_time_in_zones(
@@ -140,9 +142,9 @@ def calculate_time_in_zones(
 
 	Returns
 	-------
-	    A dictionary where keys are zone names (str) and values are total time
-	    spent in that zone in seconds (int). Includes a key for time spent
-	    outside any defined zones.
+	Time in zones
+	    A dictionary where keys are zone names and values are total time spent in that zone
+		in seconds. Includes a key for time spent outside any defined zones.
 	"""
 	time_spent_in_zones: dict[str, int] = {OUTSIDE_ZONES_KEY: 0}
 
@@ -150,8 +152,6 @@ def calculate_time_in_zones(
 		logger.warning(
 			"calculate_time_in_zones called with no zones_config. Times will be 'outside zones'."
 		)
-		# If no zones_config, all time is technically 'outside' but we need durations.
-		# Fall through, determine_hr_zone will return None for all HRs.
 	else:
 		try:
 			for zone_model in zones_config.zones_definition.all().order_by("order"):
@@ -181,14 +181,10 @@ def calculate_time_in_zones(
 
 	for i in range(len(time_data) - 1):
 		hr_value = heartrate_data[i]
-		duration_seconds = time_data[i + 1] - time_data[i]
-
-		if duration_seconds <= 0:
+		if (duration_seconds := time_data[i + 1] - time_data[i]) <= 0:
 			continue
 
-		zone_name = determine_hr_zone(hr_value, zones_config)  # type: ignore[arg-type]
-
-		if zone_name:
+		if zone_name := determine_hr_zone(hr_value, zones_config):
 			time_spent_in_zones[zone_name] = (
 				time_spent_in_zones.get(zone_name, 0) + duration_seconds
 			)

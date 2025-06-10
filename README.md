@@ -11,10 +11,13 @@
   <a href="https://github.com/stancld/strava-zones/actions/workflows/backend-release-build.yml">
     <img src="https://github.com/stancld/strava-zones/actions/workflows/backend-release-build.yml/badge.svg" alt="Backend CI Status"/>
   </a>
+  <a href="https://github.com/stancld/strava-zones/actions/workflows/extension-release-build.yml">
+    <img src="https://github.com/stancld/strava-zones/actions/workflows/extension-release-build.yml/badge.svg" alt="Extension CI Status"/>
+  </a>
   <a href="https://codecov.io/github/stancld/strava-zones">
     <img src="https://codecov.io/github/stancld/strava-zones/graph/badge.svg?token=LNOJHFDBUA" alt="Code Coverage"/>
   </a>
-  <img src="https://img.shields.io/badge/python-3.12-blue" alt="Python 3.12"/>
+  <img src="https://img.shields.io/badge/python-3.13-blue" alt="Python 3.13"/>
   <img src="https://img.shields.io/badge/Version-v0.2.2-orange" alt="Version v0.2.2"/>
   <a href="LICENSE">
     <img src="https://img.shields.io/badge/license-MIT-green" alt="License: MIT"/>
@@ -51,15 +54,13 @@ By fetching your activities and their detailed heart rate streams, ZoneLens calc
 ## 📸 Screenshots
 
 <p align="center">
+  <img src="images/calendar.png" alt="Calender" width="400" style="vertical-align:middle"/>
   <img src="images/hr_config.png" alt="HR Configuration Screenshot" width="400" style="vertical-align:middle"/>
 </p>
 
 <p align="center">
-  <img src="images/hr_config.png" alt="HR Configuration Screenshot" width="400" style="vertical-align:middle"/>
-</p>
-
-<p align="center">
-  <img src="images/popup.png" alt="Popup" width="200" style="vertical-align:middle"/>
+  <img src="images/popup.png" alt="Popup" height="200" style="vertical-align:middle"/>
+  <img src="images/login.png" alt="Popup" height="200" style="vertical-align:middle"/>
 </p>
 
 ## 🧑‍💻 For Users: Getting Started with ZoneLens

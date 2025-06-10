@@ -1,10 +1,9 @@
-# Production Dockerfile for ZoneLens Django Backend
-FROM python:3.12-slim
+FROM debian:bullseye-slim
 
 SHELL ["/bin/bash", "-c"]
 
-ENV PYTHONDONTWRITEBYTECODE 1
-ENV PYTHONUNBUFFERED 1
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
 WORKDIR /app
 ENV PYTHONPATH=/app
 
@@ -16,7 +15,19 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libpq5 \
     && rm -rf /var/lib/apt/lists/*
 
-COPY --from=ghcr.io/astral-sh/uv:0.7.8 /uv /bin/uv
+# Copy uv from the official docker image
+COPY --from=ghcr.io/astral-sh/uv:0.7.11 /uv /bin/uv
+
+# Python installation
+ENV PYTHON_VERSION=3.13
+ENV PYTHON_DIR=/opt/python
+# Set Python path to include the app directory
+ENV PYTHONPATH=/app
+# Use the virtual environment automatically
+ENV PATH="$PYTHON_DIR/bin:$PATH"
+
+COPY tools/install_python.sh tools/
+RUN ./tools/install_python.sh
 
 COPY pyproject.toml constraints.txt ./
 

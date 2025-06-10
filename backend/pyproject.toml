@@ -9,7 +9,7 @@ description = "Backend API for Strava HR Zone Calendar Visualization extension"
 authors = [
 	{name = "Daniel Stancl", email = "daniel.stancl@gmail.com"},
 ]
-requires-python = ">=3.12"
+requires-python = ">=3.13"
 dependencies = [
     "cryptography",
     "django",
@@ -34,6 +34,7 @@ dev = [
 	"requests-mock",
     "types-pytz",
     "types-requests",
+    "uv",
 ]
 
 [tool.hatch.build.targets.wheel]
@@ -82,7 +83,6 @@ ignore = [
     "E114",  # Indentation is not a multiple of 4 (comment)
     "ERA001",  # flaky
     "G004",
-    "PLC0206",  # Extracting value from dictionary without calling `.items()` (shady)
     "PLR0402",  # Use `from {module} import {name}` in lieu of alias (can be in clash with our import conventions)
     "PLR0904",  # Too many public methods (more than 20)
     "PLR0912",  # Cyclomatic complexity (already checked by mccabe)
@@ -119,7 +119,7 @@ max-complexity = 12
 indent-style = "tab"
 
 [tool.mypy]
-python_version = "3.12"
+python_version = "3.13"
 warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = true

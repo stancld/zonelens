@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -ex
 
-PYTHON_VERSION=${PYTHON_VERSION:-3.12}
+PYTHON_VERSION=${PYTHON_VERSION:-3.13}
 PYTHON_DIR=${PYTHON_DIR:-/opt/python}
 
 # Create a virtual environment with desired python version
