@@ -40,6 +40,13 @@ jobs:
           name: ${{ env.ZIP_NAME }}
           path: ${{ env.ZIP_NAME }}
 
+      - name: Test Zip File Integrity
+        if: startsWith(github.ref, 'refs/tags/zonelens-v')
+        run: |
+          echo "Testing zip file: ${{ env.ZIP_NAME }}"
+          unzip -t ${{ env.ZIP_NAME }}
+        shell: bash
+
       - name: Create or Update Release and Upload Asset (for tags)
         if: startsWith(github.ref, 'refs/tags/zonelens-v')
         uses: softprops/action-gh-release@v2

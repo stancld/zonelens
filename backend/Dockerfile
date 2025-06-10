@@ -32,7 +32,7 @@ RUN ./tools/install_python.sh
 COPY pyproject.toml constraints.txt ./
 
 # Install production Python dependencies
-RUN uv pip install --system . -c constraints.txt \
+RUN uv pip install . -c constraints.txt \
     && rm -rf /root/.cache/uv
 
 COPY . .
