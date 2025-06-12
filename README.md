@@ -146,7 +146,6 @@ The backend exposes the following API endpoints. Unless otherwise noted, API end
     *   `POST`: Receives webhook events from Strava (e.g., new activity created, activity title changed).
 
 **Heart Rate Zones Configuration Endpoints:**
-*   `GET /api/user/hr-zone-status/`: Checks if the user has HR zones configured and returns their status. (Requires authentication)
 *   `POST /api/fetch-strava-hr-zones/`: Fetches the user's default HR zones from Strava and saves them to their profile. (Requires authentication)
 *   `GET, POST /api/settings/custom-zones/`:
     *   `GET`: Lists all custom HR zone configurations for the authenticated user.

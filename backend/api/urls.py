@@ -51,11 +51,6 @@ urlpatterns = [
 		name="zone_summary",
 	),
 	path(
-		"user/hr-zone-status/",
-		views.UserHRZoneStatusView.as_view(),
-		name="user_hr_zone_status",
-	),
-	path(
 		"fetch-strava-hr-zones/",
 		views.FetchStravaHRZonesView.as_view(),
 		name="fetch_strava_hr_zones",
