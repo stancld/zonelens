@@ -366,23 +366,6 @@ class ZoneSummaryView(APIView):
 		)
 
 
-class UserHRZoneStatusView(APIView):
-	"""Check if the authenticated user has any HR zones defined."""
-
-	permission_classes = [IsAuthenticated]
-
-	def get(self, request: Request) -> Response:
-		user_profile = request.user.strava_profile
-		if not user_profile:
-			return Response(
-				{"has_hr_zones": False, "error": "Strava profile not found for user."},
-				status=status.HTTP_404_NOT_FOUND,
-			)
-
-		has_zones = HeartRateZone.objects.filter(config__user=user_profile).exists()
-		return Response({"has_hr_zones": has_zones}, status=status.HTTP_200_OK)
-
-
 class FetchStravaHRZonesView(APIView):
 	"""View to trigger fetching and storing of Strava HR zones for the authenticated user."""
 

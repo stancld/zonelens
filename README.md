@@ -28,11 +28,6 @@
 
 **ZoneLens** enhances your Strava experience by visualizing your Heart Rate (HR) zone data directly on your Training Calendar. Understand your training intensity at a glance and optimize your efforts!
 
-Visit our website: [strava-zones.com](https://strava-zones.com)
-
-> [!IMPORTANT]
-> **Chrome Web Store Status:** Our extension is currently **pending review** for publication on the Chrome Web Store. We'll update this space as soon as it's live! In the meantime, you can install it manually (see instructions below for developers, which can be adapted for users).
-
 > [!NOTE]
 > **Disclaimer:** This application is a personal project and is **not affiliated with, endorsed by, or in any way officially connected with Strava, Inc.** All Strava trademarks and logos are the property of Strava, Inc.
 
@@ -41,6 +36,14 @@ Visit our website: [strava-zones.com](https://strava-zones.com)
 ZoneLens is a tool designed for athletes who want deeper insights into their training. It consists of a **Chrome Extension** that modifies your Strava Training Calendar page and a **Django backend** that securely processes your activity data via the Strava API.
 
 By fetching your activities and their detailed heart rate streams, ZoneLens calculates the time you've spent in each heart rate zone and displays this information clearly on your calendar, helping you track your training load and recovery effectively.
+
+## 🚀 Chrome Extension
+
+The official Chrome Extension, **ZoneLens**, is now available on the Google Chrome Store! It integrates seamlessly with your Strava dashboard to provide enhanced analytics.
+
+[**Install ZoneLens from the Chrome Web Store**](https://chromewebstore.google.com/detail/zonelens/iaohacnoldkcffapjbbjfifmamcnedkk)
+
+Visit our website: [strava-zones.com](https://strava-zones.com)
 
 ## 🌟 Key Features
 
@@ -51,16 +54,11 @@ By fetching your activities and their detailed heart rate streams, ZoneLens calc
 *   **User-Friendly Interface:** Easy-to-understand visuals integrated into your existing Strava workflow.
 *   **Secure Backend API:** Robust Django backend serving data to the Chrome extension, ensuring your data is handled safely.
 
-## 📸 Screenshots
+## 📸 Application Screenshots
 
 <p align="center">
   <img src="images/calendar.png" alt="Calender" width="400" style="vertical-align:middle"/>
   <img src="images/hr_config.png" alt="HR Configuration Screenshot" width="400" style="vertical-align:middle"/>
-</p>
-
-<p align="center">
-  <img src="images/popup.png" alt="Popup" height="200" style="vertical-align:middle"/>
-  <img src="images/login.png" alt="Popup" height="200" style="vertical-align:middle"/>
 </p>
 
 ## 🧑‍💻 For Users: Getting Started with ZoneLens
@@ -126,9 +124,7 @@ This project uses Docker for easier setup and consistent development environment
     *   Navigate to your Strava Training Calendar. The extension should activate and attempt to fetch data.
     *   You may need to authenticate via the extension popup or by visiting an API endpoint like `/api/profile/` which will redirect to Strava login if you're not already authenticated.
 
-## ⚙️ API Endpoints Overview
-
-The backend exposes the following API endpoints. Unless otherwise noted, API endpoints are prefixed with `/api/`.
+## 📡 API Endpoints
 
 **Publicly Accessible Web Pages:**
 *   `GET /`: The main landing page (`index.html`). *(Note: Served by the main application router, not prefixed by `/api/`)*.
@@ -146,7 +142,6 @@ The backend exposes the following API endpoints. Unless otherwise noted, API end
     *   `POST`: Receives webhook events from Strava (e.g., new activity created, activity title changed).
 
 **Heart Rate Zones Configuration Endpoints:**
-*   `GET /api/user/hr-zone-status/`: Checks if the user has HR zones configured and returns their status. (Requires authentication)
 *   `POST /api/fetch-strava-hr-zones/`: Fetches the user's default HR zones from Strava and saves them to their profile. (Requires authentication)
 *   `GET, POST /api/settings/custom-zones/`:
     *   `GET`: Lists all custom HR zone configurations for the authenticated user.
