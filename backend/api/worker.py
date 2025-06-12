@@ -62,12 +62,20 @@ class Worker:
 		self.strava_client = StravaApiClient(self.user)
 		self.logger = get_logger(__name__)
 
-	def process_user_activities(self, after_timestamp: int | None = None) -> None:  # noqa: C901
+	def process_user_activities(  # noqa: C901
+		self, after_timestamp: int | None = None, limit: int = 10
+	) -> tuple[int | None, bool]:
 		"""Process user activities in bulk after the account setup.
 
-		Fetches user's Strava activities after a given unix timestamp,
-		processes heart rate data, and stores results in ActivityZoneTimes.
+		Fetches user's Strava activities after a given unix timestamp, processes heart rate data,
+		and stores results in ActivityZoneTimes.
 		Uses activity-specific HR zone configurations if available, otherwise DEFAULT.
+
+		Called by process_activity_queue.
+
+		Returns
+		-------
+			Tuple of the last activity's start time and an indication if more activities exist.
 		"""
 		self.logger.info(f"Starting activity processing for user {self.user.strava_id}.")
 
@@ -80,15 +88,18 @@ class Worker:
 			raise ValueError(f"Default zones config not found for user {self.user.strava_id}.")
 
 		try:
-			activities = self.strava_client.fetch_strava_activities(after=after_timestamp)
+			activities = self.strava_client.fetch_strava_activities(
+				after=after_timestamp, per_page=limit
+			)
 		except Exception as e:
 			raise ValueError(f"Failed to fetch activities for user {self.user.strava_id}") from e
 
 		if not activities:
 			self.logger.info(f"No new activities found for user {self.user.strava_id} to process.")
-			return
+			return None, False
 
 		processed_count = 0
+		last_activity_start_time = None
 		for activity_summary in activities:
 			if (activity_id_str := activity_summary.get("id")) is None:
 				self.logger.warning("Activity summary missing ID. Skipping.")
@@ -151,15 +162,14 @@ class Worker:
 						},
 					)
 			processed_count += 1
-			self.logger.info(
-				f"[SUCESS] Activity {activity_id} for user {self.user.strava_id} "
-				f"(date: {activity_date.date()})."
-			)
+			last_activity_start_time = activity_date.timestamp()
+
+		more_activities_exist = len(activities) == limit
 
 		self.logger.info(
-			f"Finished processing for user {self.user.strava_id}. "
-			f"Processed {processed_count} activities with HR data."
+			f"Finished processing {processed_count} activities for user {self.user.strava_id}."
 		)
+		return last_activity_start_time, more_activities_exist
 
 	def process_new_activity(self, user_strava_id: int, activity_id: int) -> None:
 		"""Process a single new activity for a given user upon a webhook event notification."""

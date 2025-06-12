@@ -13,6 +13,7 @@ requires-python = ">=3.13"
 dependencies = [
     "cryptography",
     "django",
+    "django-apscheduler",
     "django-cors-headers",
     "django-extensions",
     "djangorestframework",

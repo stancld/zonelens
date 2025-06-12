@@ -1174,7 +1174,9 @@ class StravaHRWorkerTests(TestCase):
 				activity_id=789, zone_name="Z2", duration_seconds=5
 			).exists()
 		)
-		mock_client_instance.fetch_strava_activities.assert_called_once_with(after=None)
+		mock_client_instance.fetch_strava_activities.assert_called_once_with(
+			after=None, per_page=10
+		)
 		self.assertEqual(
 			mock_client_instance.fetch_activity_streams.call_count, 2
 		)  # Called for 123 and 789
@@ -2086,3 +2088,24 @@ class UserHRZonesDisplayViewTests(TestCase):
 		messages = list(get_messages(response.wsgi_request))
 		self.assertEqual(len(messages), 1)
 		self.assertEqual(str(messages[0]), "The 'Default' configuration cannot be deleted.")
+
+
+class SchedulerTests(TestCase):
+	"""Tests for the scheduler functionality."""
+
+	@patch("api.scheduler.BackgroundScheduler")
+	def test_start_scheduler(self, mock_background_scheduler: MagicMock) -> None:
+		"""Test that the scheduler starts and adds the job correctly."""
+		mock_scheduler_instance = MagicMock()
+		mock_background_scheduler.return_value = mock_scheduler_instance
+
+		from api.scheduler import process_activity_queue, start_scheduler
+
+		start_scheduler()
+
+		# Assert
+		mock_background_scheduler.assert_called_once()
+		mock_scheduler_instance.add_job.assert_called_once_with(
+			process_activity_queue, "interval", minutes=1
+		)
+		mock_scheduler_instance.start.assert_called_once()
