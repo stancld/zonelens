@@ -48,8 +48,49 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
+    // Simple two-state auth check
+    async function checkAuthState() {
+        // Default state: disabled, greyed out, with an info message
+        viewMyHrZonesButton.disabled = true;
+        viewMyHrZonesButton.style.backgroundColor = '#e0e0e0';
+        viewMyHrZonesButton.style.color = '#a0a0a0';
+        viewMyHrZonesButton.style.cursor = 'not-allowed';
+        loginButton.style.display = 'block';
+        updateStatus('Please log in and connect to Strava.', 'info');
+
+        try {
+            const response = await fetch(`${API_BASE_URL}/profile/`, {
+                method: 'GET',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include'
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                if (data.strava_id) {
+                    // OK state: enabled, default style, with a success message
+                    viewMyHrZonesButton.disabled = false;
+                    viewMyHrZonesButton.style.backgroundColor = '';
+                    viewMyHrZonesButton.style.color = '';
+                    viewMyHrZonesButton.style.cursor = 'pointer';
+                    loginButton.style.display = 'none';
+                    updateStatus(`Logged in.`, 'info');
+                }
+            }
+            // Any other case (not ok, no strava_id) keeps the default disabled state.
+
+        } catch (error) {
+            console.error('Auth check failed:', error);
+            updateStatus('Unexpected error.', 'error');
+        }
+    }
+
+    // Run the check when the popup opens
+    checkAuthState();
+
     if (viewMyHrZonesButton) {
         viewMyHrZonesButton.addEventListener('click', function() {
+            // The browser will prevent the click if the button is disabled
             chrome.tabs.create({ url: `${API_BASE_URL}/user/hr-zones/` });
         });
     }
