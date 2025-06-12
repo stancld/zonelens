@@ -48,42 +48,49 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    async function checkHrZonesAvailability() {
-        try {
-            const csrftoken = await getCookie('csrftoken', BACKEND_ORIGIN);
-            if (!csrftoken) {
-                console.error('CSRF token not found for HR zone check.');
-                updateStatus('Error: CSRF token not found. Please log in to the backend.', 'error');
-                return false;
-            }
+    // Simple two-state auth check
+    async function checkAuthState() {
+        // Default state: disabled, greyed out, with an info message
+        viewMyHrZonesButton.disabled = true;
+        viewMyHrZonesButton.style.backgroundColor = '#e0e0e0';
+        viewMyHrZonesButton.style.color = '#a0a0a0';
+        viewMyHrZonesButton.style.cursor = 'not-allowed';
+        loginButton.style.display = 'block';
+        updateStatus('Please log in and connect to Strava.', 'info');
 
-            const response = await fetch(`${API_BASE_URL}/user/hr-zone-status/`, {
+        try {
+            const response = await fetch(`${API_BASE_URL}/profile/`, {
                 method: 'GET',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRFToken': csrftoken
-                },
+                headers: { 'Content-Type': 'application/json' },
                 credentials: 'include'
             });
 
             if (response.ok) {
                 const data = await response.json();
-                return data.has_hr_zones;
-            } else {
-                const errorData = await response.text();
-                console.error('Failed to fetch HR zone status:', response.status, errorData);
-                updateStatus(`Error checking HR zones: ${response.status}`, 'error');
-                return false;
+                if (data.strava_id) {
+                    // OK state: enabled, default style, with a success message
+                    viewMyHrZonesButton.disabled = false;
+                    viewMyHrZonesButton.style.backgroundColor = '';
+                    viewMyHrZonesButton.style.color = '';
+                    viewMyHrZonesButton.style.cursor = 'pointer';
+                    loginButton.style.display = 'none';
+                    updateStatus(`Logged in.`, 'info');
+                }
             }
+            // Any other case (not ok, no strava_id) keeps the default disabled state.
+
         } catch (error) {
-            console.error('Error during checkHrZonesAvailability:', error);
-            updateStatus('Failed to connect to backend for HR zone check.', 'error');
-            return false;
+            console.error('Auth check failed:', error);
+            updateStatus('Unexpected error.', 'error');
         }
     }
 
+    // Run the check when the popup opens
+    checkAuthState();
+
     if (viewMyHrZonesButton) {
         viewMyHrZonesButton.addEventListener('click', function() {
+            // The browser will prevent the click if the button is disabled
             chrome.tabs.create({ url: `${API_BASE_URL}/user/hr-zones/` });
         });
     }
