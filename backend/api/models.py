@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import uuid
 from collections import OrderedDict
+from datetime import datetime, timedelta
 from typing import ClassVar
 
 from django.conf import settings
@@ -316,3 +317,36 @@ class ActivityZoneTimes(models.Model):
 			f"{self.user.strava_id} - "
 			f"Activity {self.activity_id}: {self.zone_name} ({self.duration_seconds}s)"
 		)
+
+
+def get_default_processing_start_time() -> datetime:
+	"""Return the default start time for activity processing."""
+	return timezone.make_aware(datetime(2025, 1, 1)) - timedelta(days=1)
+
+
+class ActivityProcessingQueue(models.Model):
+	"""Queue for processing activities for newly registered users.
+
+	Once fully synced, the user is removed from this queue.
+	"""
+
+	user = models.OneToOneField(
+		StravaUser,
+		on_delete=models.CASCADE,
+		related_name="activity_processing_queue",
+		primary_key=True,
+	)
+	last_processed_activity_start_time = models.DateTimeField(
+		help_text="The start time of the last successfully processed activity.",
+		default=get_default_processing_start_time,
+	)
+	created_at = models.DateTimeField(auto_now_add=True)
+	updated_at = models.DateTimeField(auto_now=True)
+
+	class Meta:
+		ordering = ["updated_at"]
+		verbose_name = "Activity Processing Queue"
+		verbose_name_plural = "Activity Processing Queues"
+
+	def __str__(self) -> str:
+		return f"Queue entry for {self.user.strava_id}"
