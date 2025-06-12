@@ -28,3 +28,13 @@ from django.apps import AppConfig
 class ApiConfig(AppConfig):
 	default_auto_field = "django.db.models.BigAutoField"
 	name = "api"
+
+	def ready(self):
+		# Start scheduler only once, in main process.
+		# RUN_MAIN check is needed to avoid running scheduler twice in debug mode.
+		import os
+
+		if os.environ.get("RUN_MAIN"):
+			from api import scheduler
+
+			scheduler.start_scheduler()

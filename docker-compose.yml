@@ -25,6 +25,7 @@ services:
       - .env
     environment:
       DB_HOST: postgres
+      RUN_MAIN: true  # comment if want to avoid running scheduler
     command: >
       bash -c "
       python backend/manage.py migrate;

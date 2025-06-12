@@ -22,7 +22,6 @@
 
 from __future__ import annotations
 
-import calendar
 import json
 import logging
 from datetime import datetime
@@ -35,7 +34,6 @@ from django.contrib import messages
 from django.contrib.auth import get_user_model, login
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.db import transaction
-from django.db.models import QuerySet
 from django.http import (
 	HttpRequest,
 	HttpResponse,
@@ -53,9 +51,16 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from api.models import ActivityType, CustomZonesConfig, HeartRateZone, StravaUser, ZoneSummary
+from api.models import (
+	ActivityProcessingQueue,
+	ActivityType,
+	CustomZonesConfig,
+	HeartRateZone,
+	StravaUser,
+	ZoneSummary,
+)
 from api.serializers import CustomZonesConfigSerializer, ZoneSummarySerializer
-from api.utils import encrypt_data
+from api.utils import determine_weeks_in_month, encrypt_data
 from api.worker import Worker
 
 if TYPE_CHECKING:
@@ -163,18 +168,19 @@ def _get_user(
 		},
 	)
 
-	_strava_user, _strava_user_created = StravaUser.objects.update_or_create(
+	strava_user, strava_user_created = StravaUser.objects.update_or_create(
 		strava_id=strava_id,
 		defaults={
 			"user": user,
 			"access_token": encrypt_data(token_data["access_token"]),
 			"refresh_token": encrypt_data(token_data["refresh_token"]),
 			"token_expires_at": timezone.make_aware(
-				timezone.datetime.fromtimestamp(token_data["expires_at"])
+				datetime.fromtimestamp(token_data["expires_at"])
 			),
 			"scope": request.GET.get("scope", ""),
 		},
 	)
+
 	return user
 
 
@@ -252,49 +258,24 @@ class ProcessActivitiesView(APIView):
 
 	def post(self, request: Request) -> Response:
 		try:
-			strava_user_profile = request.user.strava_profile
-			user_strava_id = strava_user_profile.strava_id
-		except AttributeError:
-			logger.error(f"User {request.user.username} does not have a Strava profile linked.")
+			strava_user = StravaUser.objects.get(user=request.user)
+		except StravaUser.DoesNotExist:
 			return Response(
-				{"error": "Strava profile not found for this user."},
-				status=status.HTTP_400_BAD_REQUEST,
+				{"error": "Strava profile not found for the current user."},
+				status=status.HTTP_404_NOT_FOUND,
 			)
 
-		after_timestamp_unix: int | None = None
-		if after_timestamp_iso_str := request.data.get("after_timestamp"):
-			try:
-				# Parse ISO 8601 string to datetime object
-				dt_object = datetime.fromisoformat(after_timestamp_iso_str.replace("Z", "+00:00"))
-				# Ensure it's timezone-aware (UTC if no offset specified or 'Z' was used)
-				if dt_object.tzinfo is None or dt_object.tzinfo.utcoffset(dt_object) is None:
-					dt_object = dt_object.replace(tzinfo=timezone.utc)
-				# Convert to Unix timestamp (integer seconds)
-				after_timestamp_unix = int(dt_object.timestamp())
-			except ValueError:
-				return Response(
-					{
-						"error": "Invalid after_timestamp format. "
-						"Expected ISO 8601 string (e.g., YYYY-MM-DDTHH:MM:SSZ)."
-					},
-					status=status.HTTP_400_BAD_REQUEST,
-				)
+		# Add user to the queue if they aren't already there.
+		_obj, created = ActivityProcessingQueue.objects.get_or_create(user=strava_user)
+		if created:
+			logger.info(f"User {strava_user.strava_id} added to the activity processing queue.")
+			message = "Activity processing has been initiated and will run in the background."
+		else:
+			message = (
+				"Activity processing is already in progress and will continue in the background."
+			)
 
-		try:
-			worker = Worker(user_strava_id=user_strava_id)
-			worker.process_user_activities(after_timestamp=after_timestamp_unix)
-			return Response(
-				{"message": f"Successfully processed activities for user {user_strava_id}"},
-				status=status.HTTP_200_OK,
-			)
-		except ValueError as e:
-			return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
-		except Exception as e:
-			logger.exception(f"Error processing activities for user {user_strava_id}: {e}")
-			return Response(
-				{"error": "An unexpected error occurred during processing."},
-				status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-			)
+		return Response({"status": message}, status=status.HTTP_202_ACCEPTED)
 
 
 class ZoneSummaryView(APIView):
@@ -344,7 +325,7 @@ class ZoneSummaryView(APIView):
 
 		# Fetch weekly summaries
 		weekly_summaries = []
-		for week in sorted(self._determine_weeks_in_month(year, month)):
+		for week in sorted(determine_weeks_in_month(year, month)):
 			weekly_summary_qs, _created = ZoneSummary.get_or_create_summary(
 				user_profile=user_profile,
 				period_type=ZoneSummary.PeriodType.WEEKLY,  # type: ignore[arg-type]
@@ -384,37 +365,6 @@ class ZoneSummaryView(APIView):
 			status=status.HTTP_200_OK,
 		)
 
-	@staticmethod
-	def _determine_weeks_in_month(year: int, month: int) -> list[int]:
-		weeks_in_month = []
-		cal = calendar.Calendar()
-		month_days_weeks = cal.monthdatescalendar(year, month)
-		for week_days in month_days_weeks:
-			for day_date in week_days:
-				if day_date.year == year and day_date.month == month:
-					iso_year, iso_week, _ = day_date.isocalendar()
-					if iso_year == year and iso_week not in weeks_in_month:
-						weeks_in_month.append(iso_week)
-					break
-		return weeks_in_month
-
-
-class UserHRZoneStatusView(APIView):
-	"""Check if the authenticated user has any HR zones defined."""
-
-	permission_classes = [IsAuthenticated]
-
-	def get(self, request: Request) -> Response:
-		user_profile = request.user.strava_profile
-		if not user_profile:
-			return Response(
-				{"has_hr_zones": False, "error": "Strava profile not found for user."},
-				status=status.HTTP_404_NOT_FOUND,
-			)
-
-		has_zones = HeartRateZone.objects.filter(config__user=user_profile).exists()
-		return Response({"has_hr_zones": has_zones}, status=status.HTTP_200_OK)
-
 
 class FetchStravaHRZonesView(APIView):
 	"""View to trigger fetching and storing of Strava HR zones for the authenticated user."""
@@ -434,7 +384,17 @@ class FetchStravaHRZonesView(APIView):
 		try:
 			worker = Worker(user_strava_id=user_strava_profile.strava_id)
 			if _success := worker.fetch_and_store_strava_hr_zones():
-				# The worker logs specifics. Here, just confirm the operation.
+				# Check if user has HR zones defined now and add to queue if it's the first time.
+				if CustomZonesConfig.objects.filter(user=user_strava_profile).exists():
+					_obj, created = ActivityProcessingQueue.objects.get_or_create(
+						user=user_strava_profile
+					)
+					if created:
+						logger.info(
+							f"User {user_strava_profile.strava_id} added to activity processing "
+							"queue after fetching Strava HR zones."
+						)
+
 				return Response(
 					{"message": "Strava HR zones fetch process completed."},
 					status=status.HTTP_200_OK,
@@ -835,6 +795,16 @@ class UserHRZonesDisplayView(LoginRequiredMixin, TemplateView):
 			messages.success(
 				request, f"Configuration for {ActivityType(activity_type_value).label} added."
 			)
+
+			# Check if user has any other HR zone configs. If not, this is their first.
+			# Add to processing queue only if it's the first config.
+			if CustomZonesConfig.objects.filter(user=strava_user).count() == 1:
+				_obj, created = ActivityProcessingQueue.objects.get_or_create(user=strava_user)
+				if created:
+					logger.info(
+						f"User {strava_user.strava_id} added to activity processing queue."
+					)
+
 		except Exception as e:
 			logger.error(f"Error creating new activity config for {activity_type_value}: {e!r}")
 			messages.error(request, "Failed to add new configuration.")
