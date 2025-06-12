@@ -48,40 +48,6 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    async function checkHrZonesAvailability() {
-        try {
-            const csrftoken = await getCookie('csrftoken', BACKEND_ORIGIN);
-            if (!csrftoken) {
-                console.error('CSRF token not found for HR zone check.');
-                updateStatus('Error: CSRF token not found. Please log in to the backend.', 'error');
-                return false;
-            }
-
-            const response = await fetch(`${API_BASE_URL}/user/hr-zone-status/`, {
-                method: 'GET',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRFToken': csrftoken
-                },
-                credentials: 'include'
-            });
-
-            if (response.ok) {
-                const data = await response.json();
-                return data.has_hr_zones;
-            } else {
-                const errorData = await response.text();
-                console.error('Failed to fetch HR zone status:', response.status, errorData);
-                updateStatus(`Error checking HR zones: ${response.status}`, 'error');
-                return false;
-            }
-        } catch (error) {
-            console.error('Error during checkHrZonesAvailability:', error);
-            updateStatus('Failed to connect to backend for HR zone check.', 'error');
-            return false;
-        }
-    }
-
     if (viewMyHrZonesButton) {
         viewMyHrZonesButton.addEventListener('click', function() {
             chrome.tabs.create({ url: `${API_BASE_URL}/user/hr-zones/` });
