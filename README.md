@@ -21,7 +21,7 @@
     <img src="https://img.shields.io/website?url=https://www.strava-zones.com&up_message=online&down_message=offline&label=strava-zones.com" alt="Website Status"/>
   </a>
   <img src="https://img.shields.io/badge/python-3.13-blue" alt="Python 3.13"/>
-  <img src="https://img.shields.io/badge/Version-v0.2.3-orange" alt="Version v0.2.3"/>
+  <img src="https://img.shields.io/badge/Version-v0.3.0-orange" alt="Version v0.3.0"/>
   <a href="LICENSE">
     <img src="https://img.shields.io/badge/license-MIT-green" alt="License: MIT"/>
   </a>
