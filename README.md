@@ -14,8 +14,8 @@
   <a href="https://github.com/stancld/strava-zones/actions/workflows/extension-release-build.yml">
     <img src="https://github.com/stancld/strava-zones/actions/workflows/extension-release-build.yml/badge.svg" alt="Extension CI Status"/>
   </a>
-  <a href="https://codecov.io/github/stancld/strava-zones">
-    <img src="https://codecov.io/github/stancld/strava-zones/graph/badge.svg?token=LNOJHFDBUA" alt="Code Coverage"/>
+  <a href="https://codecov.io/github/stancld/zonelens">
+    <img src="https://codecov.io/github/stancld/zonelens/graph/badge.svg?token=LNOJHFDBUA" alt="Code Coverage"/>
   </a>
   <a href="https://www.strava-zones.com" target="_blank">
     <img src="https://img.shields.io/website?url=https://www.strava-zones.com&up_message=online&down_message=offline&label=strava-zones.com" alt="Website Status"/>
