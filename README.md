@@ -17,8 +17,8 @@
   <a href="https://codecov.io/github/stancld/zonelens">
     <img src="https://codecov.io/github/stancld/zonelens/graph/badge.svg?token=LNOJHFDBUA" alt="Code Coverage"/>
   </a>
-  <a href="https://www.strava-zones.com" target="_blank">
-    <img src="https://img.shields.io/website?url=https://www.strava-zones.com&up_message=online&down_message=offline&label=strava-zones.com" alt="Website Status"/>
+  <a href="web" target="_blank">
+    <img src="https://img.shields.io/website?url=https://www.strava-zones.com&up_message=online&down_message=offline&label=web" alt="Website Status"/>
   </a>
   <img src="https://img.shields.io/badge/python-3.13-blue" alt="Python 3.13"/>
   <img src="https://img.shields.io/badge/Version-v0.3.0-orange" alt="Version v0.3.0"/>
