@@ -17,6 +17,9 @@
   <a href="https://codecov.io/github/stancld/strava-zones">
     <img src="https://codecov.io/github/stancld/strava-zones/graph/badge.svg?token=LNOJHFDBUA" alt="Code Coverage"/>
   </a>
+  <a href="https://www.strava-zones.com" target="_blank">
+    <img src="https://img.shields.io/website?url=https://www.strava-zones.com&up_message=online&down_message=offline&label=strava-zones.com" alt="Website Status"/>
+  </a>
   <img src="https://img.shields.io/badge/python-3.13-blue" alt="Python 3.13"/>
   <img src="https://img.shields.io/badge/Version-v0.2.3-orange" alt="Version v0.2.3"/>
   <a href="LICENSE">
