@@ -395,10 +395,12 @@ class FetchStravaHRZonesView(APIView):
 							"queue after fetching Strava HR zones."
 						)
 
-				return Response(
-					{"message": "Strava HR zones fetch process completed."},
-					status=status.HTTP_200_OK,
-				)
+				successful_message = "Strava HR zones fetch process completed."
+				if created:
+					successful_message += (
+						" Strava activities will be processed as of January 1, 2025."
+					)
+				return Response({"message": successful_message}, status=status.HTTP_200_OK)
 			# This case implies a handled failure within the worker, e.g., API error.
 			# The worker should have logged the specific reason.
 			return Response(
