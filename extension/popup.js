@@ -1,26 +1,3 @@
-// Helper function to get a cookie by name from a specific URL
-async function getCookie(name, url) {
-    return new Promise((resolve) => {
-        if (typeof chrome !== "undefined" && chrome.cookies) {
-            chrome.cookies.get({ url: url, name: name }, function(cookie) {
-                if (chrome.runtime.lastError) {
-                    console.warn(`Error getting cookie '${name}' from ${url}: ${chrome.runtime.lastError.message}`);
-                    resolve(null);
-                } else if (cookie) {
-                    resolve(cookie.value);
-                } else {
-                    resolve(null); // Cookie not found
-                }
-            });
-        } else {
-            // This case should ideally not happen in a functioning extension popup.
-            // Indicates a more fundamental issue (e.g., script running outside extension context, or chrome object is broken).
-            console.error("chrome.cookies API is not available. Cannot retrieve cookies.");
-            resolve(null);
-        }
-    });
-}
-
 document.addEventListener('DOMContentLoaded', function() {
     const loginButton = document.getElementById('loginButton');
     const viewMyHrZonesButton = document.getElementById('viewMyHrZonesButton');
