@@ -3,9 +3,7 @@
   "name": "ZoneLens",
   "version": "0.3.0",
   "description": "Enhances your Strava experience by visualizing your Heart Rate (HR) zone data directly on your Training Calendar.",
-  "permissions": [
-    "cookies"
-  ],
+  "permissions": [],
   "host_permissions": [
     "*://*.strava.com/*",
     "https://localhost:8000/*",
