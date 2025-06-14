@@ -8,7 +8,6 @@
   ],
   "host_permissions": [
     "*://*.strava.com/*",
-    "https://localhost:8000/*",
     "https://strava-zones.com/*"
   ],
   "content_scripts": [
