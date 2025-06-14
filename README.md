@@ -14,11 +14,14 @@
   <a href="https://github.com/stancld/strava-zones/actions/workflows/extension-release-build.yml">
     <img src="https://github.com/stancld/strava-zones/actions/workflows/extension-release-build.yml/badge.svg" alt="Extension CI Status"/>
   </a>
-  <a href="https://codecov.io/github/stancld/strava-zones">
-    <img src="https://codecov.io/github/stancld/strava-zones/graph/badge.svg?token=LNOJHFDBUA" alt="Code Coverage"/>
+  <a href="https://codecov.io/github/stancld/zonelens">
+    <img src="https://codecov.io/github/stancld/zonelens/graph/badge.svg?token=LNOJHFDBUA" alt="Code Coverage"/>
+  </a>
+  <a href="web" target="_blank">
+    <img src="https://img.shields.io/website?url=https://www.strava-zones.com&up_message=online&down_message=offline&label=web" alt="Website Status"/>
   </a>
   <img src="https://img.shields.io/badge/python-3.13-blue" alt="Python 3.13"/>
-  <img src="https://img.shields.io/badge/Version-v0.2.3-orange" alt="Version v0.2.3"/>
+  <img src="https://img.shields.io/badge/Version-v0.3.0-orange" alt="Version v0.3.0"/>
   <a href="LICENSE">
     <img src="https://img.shields.io/badge/license-MIT-green" alt="License: MIT"/>
   </a>
