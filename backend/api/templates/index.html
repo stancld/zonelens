@@ -9,6 +9,7 @@
     <link rel="apple-touch-icon" href="{% static 'images/apple-touch-icon.png' %}">
     <link rel="icon" type="image/png" sizes="192x192" href="{% static 'images/icon-192.png' %}">
     <link rel="icon" type="image/png" sizes="512x512" href="{% static 'images/icon-512.png' %}">
+    <link rel="stylesheet" href="{% static 'css/buttons.css' %}">
 
     <title>ZoneLens - Login</title>
     <style>
@@ -88,20 +89,6 @@
             word-wrap: break-word;
             font-size: 0.9em;
         }
-        .logout-button {
-            background-color: #777;
-            color: white;
-            border: none;
-            padding: 10px 20px;
-            font-size: 1em;
-            border-radius: 5px;
-            cursor: pointer;
-            margin-top: 15px;
-            transition: background-color 0.3s ease;
-        }
-        .logout-button:hover {
-            background-color: #555;
-        }
         .author-credit {
             font-size: 0.8em;
             color: #777;
@@ -163,7 +150,7 @@
         <div id="profile" style="display: none;">
             <h2>Connection Status</h2>
             <p id="connection-status-message" style="text-align: center; font-size: 1.2em; margin-top: 20px; margin-bottom: 20px; color: #333;"></p>
-            <button class="logout-button" onclick="logout()">Logout</button>
+            <button class="basic-button" onclick="logout()">Logout</button>
         </div>
 
         <div id="error" style="display: none;">
