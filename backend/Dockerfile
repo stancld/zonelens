@@ -5,14 +5,10 @@ SHELL ["/bin/bash", "-c"]
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 WORKDIR /app
-ENV PYTHONPATH=/app
-
-RUN groupadd -r appuser && useradd -r -g appuser -d /app -s /sbin/nologin -c "Docker image user" appuser
 
 # Install essential system dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
-    libpq5 \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy uv from the official docker image
@@ -28,18 +24,15 @@ ENV PATH="$PYTHON_DIR/bin:$PATH"
 
 COPY tools/install_python.sh tools/
 RUN ./tools/install_python.sh
-RUN chown -R appuser:appuser $PYTHON_DIR # Ensure appuser can access Python installation
-
-COPY pyproject.toml constraints.txt ./
 
 # Install production Python dependencies
+COPY pyproject.toml .
+COPY constraints.txt .
+
 RUN uv pip install . -c constraints.txt \
     && rm -rf /root/.cache/uv
 
 COPY . .
-
-RUN chown -R appuser:appuser /app
-USER appuser
 
 EXPOSE 8000
 
