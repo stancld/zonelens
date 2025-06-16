@@ -34,6 +34,8 @@ RUN uv pip install . -c constraints.txt \
 
 COPY . .
 
+ENV DJANGO_SETTINGS_MODULE=strava_zones_backend.settings
+
 EXPOSE 8000
 
-CMD ["gunicorn", "--workers", "4", "--bind", "0.0.0.0:8000", "strava_zones_backend.wsgi:application"]
+CMD ["gunicorn", "-c", "/app/api/gunicorn.conf.py", "--workers", "4", "--bind", "0.0.0.0:8000", "strava_zones_backend.wsgi:application"]

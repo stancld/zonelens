@@ -30,7 +30,7 @@ class ApiConfig(AppConfig):
 	name = "api"
 
 	def ready(self):
-		# Start scheduler only once, in main process.
+		# Start scheduler only once, in main process for local development
 		# RUN_MAIN check is needed to avoid running scheduler twice in debug mode.
 		import os
 
