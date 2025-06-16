@@ -134,6 +134,18 @@
             width: auto;
             display: block;
         }
+        .extension-link {
+            margin-top: 25px;
+            font-size: 1.0em;
+            color: #555;
+        }
+        .extension-link a {
+            color: #FC4C02;
+            text-decoration: none;
+        }
+        .extension-link a:hover {
+            text-decoration: underline;
+        }
     </style>
 </head>
 <body>
@@ -144,6 +156,8 @@
             <a href="/api/auth/strava" class="strava-connect-link">
                 <img src="{% static 'images/btn_strava_connect_with_orange_x2.png' %}" alt="Login with Strava" class="strava-connect-img">
             </a>
+
+            <p class="extension-link">Get the <a href="https://chrome.google.com/webstore/detail/zonelens/iaohacnoldkcffapjbbjfifmamcnedkk" target="_blank" rel="noopener noreferrer">ZoneLens Chrome Extension</a>.</p>
         </div>
 
         <div id="profile" style="display: none;">
