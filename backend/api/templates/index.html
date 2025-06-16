@@ -150,7 +150,11 @@
         <div id="profile" style="display: none;">
             <h2>Connection Status</h2>
             <p id="connection-status-message" style="text-align: center; font-size: 1.2em; margin-top: 20px; margin-bottom: 20px; color: #333;"></p>
-            <button class="basic-button" onclick="logout()">Logout</button>
+            <div style="display: flex; justify-content: center; align-items: center; gap: 10px; margin-top: 20px;">
+                <button class="basic-button" onclick="logout()">Logout</button>
+                <button class="basic-button strava-button-override" onclick="openStravaCalendar()">Calendar</button>
+                <a href="{% url 'user_hr_zones_display' %}" class="basic-button strava-button-override">My HR Zones</a>
+            </div>
         </div>
 
         <div id="error" style="display: none;">
@@ -166,6 +170,14 @@
     <p class="author-credit">Authored by stancld</p>
 
     <script>
+        function openStravaCalendar() {
+            const monthShortNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+            const now = new Date();
+            const monthShortName = monthShortNames[now.getMonth()]; // Get current month's short name
+            const stravaCalendarUrl = `https://www.strava.com/athlete/calendar#${monthShortName}`;
+            window.open(stravaCalendarUrl, '_blank'); // Open in a new tab
+        }
+
         const authSection = document.getElementById('auth-section');
         const profileSection = document.getElementById('profile');
         const connectionStatusMessage = document.getElementById('connection-status-message'); // Changed from profileData

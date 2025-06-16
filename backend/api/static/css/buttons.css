@@ -14,3 +14,11 @@
 .basic-button:hover {
     background-color: #555;
 }
+
+.strava-button-override {
+    background-color: #FC4C02;
+}
+
+.strava-button-override:hover {
+    background-color: #e04402;
+}
