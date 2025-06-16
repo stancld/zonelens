@@ -28,6 +28,7 @@ ENV PATH="$PYTHON_DIR/bin:$PATH"
 
 COPY tools/install_python.sh tools/
 RUN ./tools/install_python.sh
+RUN chown -R appuser:appuser $PYTHON_DIR # Ensure appuser can access Python installation
 
 COPY pyproject.toml constraints.txt ./
 
