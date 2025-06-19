@@ -53,21 +53,14 @@ def process_activity_queue() -> None:
 			if queue_entry.last_processed_activity_start_time
 			else 0
 		)
-		last_processed_timestamp, more_activities = worker.process_user_activities(
-			after_timestamp=after_timestamp
+		last_processed_timestamp, more_activities, processed_in_batch = (
+			worker.process_user_activities(after_timestamp=after_timestamp)
 		)
 
 		if last_processed_timestamp:
-			processed_date = datetime.fromtimestamp(last_processed_timestamp)
-			try:
-				_update_zone_summaries_for_user_period_in_scheduler(
-					user_profile, processed_date.year, processed_date.month
-				)
-			except Exception as e_summary:
-				logger.exception(
-					f"Scheduler: Error updating zone summaries for user {user_profile.strava_id} "
-					f"for {processed_date.year}-{processed_date.month:02d}: {e_summary}"
-				)
+			_try_update_zone_summaries_for_user_period(
+				user_profile, datetime.fromtimestamp(last_processed_timestamp)
+			)
 
 		if not more_activities:
 			logger.info(
@@ -90,22 +83,22 @@ def process_activity_queue() -> None:
 					needs_current_month_update = False
 
 			if needs_current_month_update:
-				try:
-					_update_zone_summaries_for_user_period_in_scheduler(
-						user_profile, current_year, current_month
-					)
-				except Exception as e_current_summary:
-					logger.exception(
-						f"Scheduler: Error updating zone summaries for user {user_profile.strava_id} "  # noqa: E501
-						f"for current period {current_year}-{current_month:02d}: {e_current_summary}"  # noqa: E501
-					)
+				_try_update_zone_summaries_for_user_period(user_profile, current_time)
 
 		elif last_processed_timestamp:  # Implies more_activities is True
 			queue_entry.last_processed_activity_start_time = timezone.make_aware(
 				datetime.fromtimestamp(last_processed_timestamp)
 			)
+			fields_to_update = ["last_processed_activity_start_time", "updated_at"]
+			if processed_in_batch > 0:
+				# Ensure num_processed is not None before incrementing
+				if queue_entry.num_processed is None:
+					queue_entry.num_processed = 0
+				queue_entry.num_processed += processed_in_batch
+				fields_to_update.append("num_processed")
+
 			queue_entry.updated_at = timezone.now()  # Touch updated_at to signify work done
-			queue_entry.save()
+			queue_entry.save(update_fields=fields_to_update)
 			logger.info(
 				f"Batch processed for user {user_profile.strava_id}. "
 				f"Next batch will start from {queue_entry.last_processed_activity_start_time}."
@@ -124,7 +117,7 @@ def process_activity_queue() -> None:
 		# Note: Zone summaries are not updated if activity processing itself fails.
 
 
-def _update_zone_summaries_for_user_period_in_scheduler(
+def _update_zone_summaries_for_user_period(
 	user_profile: StravaUser, year: int, month: int
 ) -> None:
 	"""Ensure monthly/weekly zone summaries are updated for a user, year, and month."""
@@ -152,6 +145,21 @@ def _update_zone_summaries_for_user_period_in_scheduler(
 		f"Scheduler: Finished updating zone summaries for user {user_profile.strava_id}, "
 		f"period {year}-{month:02d}"
 	)
+
+
+def _try_update_zone_summaries_for_user_period(
+	user_profile: StravaUser,
+	processed_date: datetime,
+) -> None:
+	try:
+		_update_zone_summaries_for_user_period(
+			user_profile, processed_date.year, processed_date.month
+		)
+	except Exception as e:
+		logger.exception(
+			f"Scheduler: Error updating zone summaries for user {user_profile.strava_id} "
+			f"for {processed_date.year}-{processed_date.month:02d}: {e}"
+		)
 
 
 def start_scheduler() -> None:  # Added return type
