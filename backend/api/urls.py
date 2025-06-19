@@ -28,6 +28,7 @@ from api import views
 
 urlpatterns = [
 	path("profile/", views.user_profile, name="user_profile"),
+	path("profile/sync_status", views.sync_status, name="sync_status"),
 	path("auth/strava/", views.strava_authorize, name="strava_authorize"),
 	path("auth/strava/callback/", views.strava_callback, name="strava_callback"),
 	path(

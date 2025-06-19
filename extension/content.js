@@ -37,7 +37,7 @@ async function fetchActivityData(year, monthShortName) {
     try {
         const response = await fetch(apiUrl, {
             method: 'GET',
-            credentials: 'include', // Send cookies (like session cookies) with the request
+            credentials: 'include',
             headers: {
                 'Content-Type': 'application/json',
             }
@@ -206,7 +206,60 @@ function clearAllInjectedUI() {
     weeklyElements.forEach(el => el.remove());
 }
 
-function initHrZoneDisplay() {
+async function injectSyncStatus() {
+    const syncStatusUrl = `${API_BASE_URL}/profile/sync_status`;
+    try {
+        const response = await fetch(syncStatusUrl, {
+            method: 'GET',
+            credentials: 'include',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+            }
+        });
+
+        console.log(response)
+
+        if (response.ok) {
+            const data = await response.json();
+            if (data.sync_status) {
+                const { num_processed, total_activities } = data.sync_status;
+                const statusDiv = document.createElement('div');
+                statusDiv.id = 'zonelens-sync-status';
+
+                statusDiv.style.textAlign = 'center';
+                statusDiv.style.fontSize = '14px';
+                statusDiv.style.marginBottom = '15px';
+                statusDiv.style.padding = '10px';
+                statusDiv.style.border = '1px solid #bde5f8';
+                statusDiv.style.backgroundColor = '#f0f8ff';
+                statusDiv.style.color = '#00529b';
+                statusDiv.style.borderRadius = '5px';
+                statusDiv.style.maxWidth = '800px';
+                statusDiv.style.margin = '0 auto 15px auto';
+
+                let statusHtml = `Initial activity sync: <strong>${num_processed}/${total_activities}</strong> activities synced.`;
+                console.log(num_processed)
+                console.log(total_activities)
+                if (num_processed < total_activities) {
+                    statusHtml += `<br><span style="font-size:0.9em;">(Processing may take some time to complete. Data in calendar may be incomplete.)</span>`;
+                }
+                statusDiv.innerHTML = statusHtml;
+
+                const calendarHeader = document.querySelector('#calendar-header');
+                if (calendarHeader) {
+                    if (!document.getElementById(statusDiv.id)) {
+                        calendarHeader.parentNode.insertBefore(statusDiv, calendarHeader);
+                    }
+                }
+            }
+        }
+    } catch (error) {
+        console.error('ZoneLens: Failed to fetch profile for sync status:', error);
+    }
+}
+
+async function initHrZoneDisplay() {
     const currentPath = window.location.pathname; // e.g., /athlete/calendar/2024
     const currentHash = window.location.hash;    // e.g., "#Jul"
 
@@ -275,15 +328,16 @@ function initHrZoneDisplay() {
     }
 }
 
-// Initial load
 if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initHrZoneDisplay);
+    document.addEventListener('DOMContentLoaded', init);
 } else {
-    initHrZoneDisplay();
+    if (window.location.pathname.includes('/athlete/calendar')) {
+        console.log("ZoneLens: Calendar page detected. Initializing.");
+        injectSyncStatus();
+        initHrZoneDisplay();
+
+        // Re-run for month changes
+        window.addEventListener('hashchange', initHrZoneDisplay);
+        window.addEventListener('popstate', initHrZoneDisplay);
+    }
 }
-
-// Listen for hash changes (SPA navigation between months)
-window.addEventListener('hashchange', initHrZoneDisplay);
-
-// Strava might also use popstate for navigation in some cases
-window.addEventListener('popstate', initHrZoneDisplay);

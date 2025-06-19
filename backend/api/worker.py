@@ -64,7 +64,7 @@ class Worker:
 
 	def process_user_activities(  # noqa: C901
 		self, after_timestamp: int | None = None, limit: int = 10
-	) -> tuple[int | None, bool]:
+	) -> tuple[int | None, bool, int]:
 		"""Process user activities in bulk after the account setup.
 
 		Fetches user's Strava activities after a given unix timestamp, processes heart rate data,
@@ -75,7 +75,10 @@ class Worker:
 
 		Returns
 		-------
-			Tuple of the last activity's start time and an indication if more activities exist.
+			Tuple of:
+				- last activity's start time,
+				- boolean indicating if more activities exist,
+				- count of processed activities.
 		"""
 		self.logger.info(f"Starting activity processing for user {self.user.strava_id}.")
 
@@ -96,7 +99,7 @@ class Worker:
 
 		if not activities:
 			self.logger.info(f"No new activities found for user {self.user.strava_id} to process.")
-			return None, False
+			return None, False, 0
 
 		processed_count = 0
 		last_activity_start_time = None
@@ -169,7 +172,7 @@ class Worker:
 		self.logger.info(
 			f"Finished processing {processed_count} activities for user {self.user.strava_id}."
 		)
-		return last_activity_start_time, more_activities_exist
+		return last_activity_start_time, more_activities_exist, processed_count
 
 	def process_new_activity(self, user_strava_id: int, activity_id: int) -> None:
 		"""Process a single new activity for a given user upon a webhook event notification."""

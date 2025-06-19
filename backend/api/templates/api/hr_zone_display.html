@@ -220,6 +220,15 @@ nav {
     <div class="container">
         <h1>Your Custom Heart Rate Zones</h1>
 
+        {% if total_activities is not None %}
+            <div style="text-align: center; font-size: 0.9em; margin-bottom: 15px; padding: 10px; border: 1px solid #bde5f8; background-color: #f0f8ff; color: #00529b; border-radius: 5px;">
+                Initial activity sync: <strong>{{ num_processed }}/{{ total_activities }}</strong> activities synced.
+                {% if num_processed < total_activities %}
+                    <br><span style="font-size:0.9em;">(Processing may take some time to complete. You can refresh this page for updates.)</span>
+                {% endif %}
+            </div>
+        {% endif %}
+
         {% if error_message %}
             <p class="error-message">{{ error_message }}</p>
         {% elif user_zone_configurations %}

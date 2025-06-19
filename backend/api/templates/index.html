@@ -150,6 +150,14 @@
         <div id="profile" style="display: none;">
             <h2>Connection Status</h2>
             <p id="connection-status-message" style="text-align: center; font-size: 1.2em; margin-top: 20px; margin-bottom: 20px; color: #333;"></p>
+            {% if total_activities is not None %}
+            <div style="text-align: center; font-size: 0.9em; margin-bottom: 15px; padding: 10px; border: 1px solid #bde5f8; background-color: #f0f8ff; color: #00529b; border-radius: 5px;">
+                Initial activity sync: <strong>{{ num_processed }}/{{ total_activities }}</strong> activities synced.
+                 {% if num_processed < total_activities %}
+                    <br><span style="font-size:0.9em;">(Processing...)</span>
+                {% endif %}
+            </div>
+            {% endif %}
             <div style="display: flex; justify-content: center; align-items: center; gap: 10px; margin-top: 20px;">
                 <button class="basic-button" onclick="logout()">Logout</button>
                 <button class="basic-button strava-button-override" onclick="openStravaCalendar()">Calendar</button>

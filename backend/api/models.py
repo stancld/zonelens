@@ -340,6 +340,12 @@ class ActivityProcessingQueue(models.Model):
 		help_text="The start time of the last successfully processed activity.",
 		default=get_default_processing_start_time,
 	)
+	total_activities = models.IntegerField(
+		null=True, blank=True, help_text="Total number of activities to sync for the user."
+	)
+	num_processed = models.IntegerField(
+		default=0, help_text="Number of activities processed so far."
+	)
 	created_at = models.DateTimeField(auto_now_add=True)
 	updated_at = models.DateTimeField(auto_now=True)
 
