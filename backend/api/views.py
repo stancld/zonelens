@@ -1060,3 +1060,27 @@ class StravaAuthorizeView(LoginRequiredMixin, View):
 		}
 
 		return HttpResponseRedirect(f"{STRAVA_AUTH_URL}?{urlencode(params)}")
+
+
+class DeleteAccountView(APIView):
+	"""Handle user account deletion."""
+
+	permission_classes = [IsAuthenticated]
+
+	def delete(self, request: Request) -> Response:
+		"""Delete the user's account and associated data."""
+		try:
+			user = request.user
+			# The on_delete=models.CASCADE on the StravaUser.user field will handle
+			# deleting the associated StravaUser, HR data, config etc.
+			user.delete()
+			return Response(
+				{"message": "Account deleted successfully."},
+				status=status.HTTP_204_NO_CONTENT,
+			)
+		except Exception as e:
+			logger.error(f"Error deleting account for user {request.user.id}: {e}")
+			return Response(
+				{"error": "An error occurred during account deletion."},
+				status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+			)

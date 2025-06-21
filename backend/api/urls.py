@@ -66,4 +66,5 @@ urlpatterns = [
 		views.StravaWebhookAPIView.as_view(),
 		name="strava_webhook",
 	),
+	path("profile/delete/", views.DeleteAccountView.as_view(), name="delete_profile"),
 ]
