@@ -133,6 +133,69 @@
         .extension-link a:hover {
             text-decoration: underline;
         }
+        .delete-account-container {
+            position: fixed;
+            bottom: 15px;
+            left: 15px;
+            z-index: 1000;
+        }
+        .delete-button {
+            background-color: #aaaaaa;
+            color: #ffffff;
+            border: 1px solid #999999;
+            padding: 8px 15px;
+            font-size: 0.9em;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        /* Modal Styles */
+        .modal {
+            display: none; /* Hidden by default */
+            position: fixed; /* Stay in place */
+            z-index: 2000; /* Sit on top */
+            left: 0;
+            top: 0;
+            width: 100%; /* Full width */
+            height: 100%; /* Full height */
+            overflow: auto; /* Enable scroll if needed */
+            background-color: rgba(0,0,0,0.6); /* Black w/ opacity */
+        }
+        .modal-content {
+            background-color: #fefefe;
+            margin: 15% auto; /* 15% from the top and centered */
+            padding: 25px;
+            border: 1px solid #888;
+            width: 80%;
+            max-width: 450px;
+            border-radius: 8px;
+            text-align: center;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+        }
+        .modal-buttons {
+            margin-top: 20px;
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+        }
+        .modal-button {
+            border: none;
+            padding: 10px 20px;
+            font-size: 1em;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: opacity 0.2s;
+        }
+        .modal-button:hover {
+            opacity: 0.85;
+        }
+        .continue-btn {
+            background-color: #d9534f; /* Red */
+            color: white;
+        }
+        .cancel-btn {
+            background-color: #aaaaaa; /* Grey */
+            color: white;
+        }
     </style>
 </head>
 <body>
@@ -174,6 +237,87 @@
     <div class="strava-logo-container">
         <a href="https://strava.com" target="_blank" rel="noopener noreferrer"><img src="{% static 'images/api_logo_pwrdBy_strava_stack_orange.png' %}" alt="Powered by Strava"></a>
     </div>
+
+    {% if user.is_authenticated %}
+    <div class="delete-account-container">
+        <button class="delete-button">Delete account</button>
+    </div>
+
+    <div id="delete-confirm-modal" class="modal">
+        <div class="modal-content">
+            <p>Are you sure you want to proceed with account deletion?</p>
+            <div class="modal-buttons">
+                <button id="confirm-delete-btn" class="modal-button continue-btn">Continue</button>
+                <button id="cancel-delete-btn" class="modal-button cancel-btn">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- Delete Account Modal Logic ---
+        const deleteBtn = document.querySelector('.delete-button');
+        const deleteModal = document.getElementById('delete-confirm-modal');
+        const cancelDeleteBtn = document.getElementById('cancel-delete-btn');
+        const confirmDeleteBtn = document.getElementById('confirm-delete-btn');
+
+        function getCookie(name) {
+            let cookieValue = null;
+            if (document.cookie && document.cookie !== '') {
+                const cookies = document.cookie.split(';');
+                for (let i = 0; i < cookies.length; i++) {
+                    const cookie = cookies[i].trim();
+                    if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                        break;
+                    }
+                }
+            }
+            return cookieValue;
+        }
+
+        deleteBtn.addEventListener('click', () => {
+            deleteModal.style.display = 'block';
+        });
+
+        cancelDeleteBtn.addEventListener('click', () => {
+            deleteModal.style.display = 'none';
+        });
+
+        confirmDeleteBtn.addEventListener('click', () => {
+            fetch("{% url 'delete_profile' %}", {
+                method: 'DELETE',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCookie('csrftoken'),
+                },
+            })
+            .then(response => {
+                if (response.status === 204) {
+                    alert('Account deleted successfully.');
+                    window.location.href = '/';
+                } else {
+                    return response.json().then(data => {
+                        throw new Error(data.error || 'Failed to delete account.');
+                    });
+                }
+            })
+            .catch(error => {
+                console.error('Error deleting account:', error);
+                alert(error.message);
+            })
+            .finally(() => {
+                deleteModal.style.display = 'none';
+            });
+        });
+
+        // Close the modal if the user clicks anywhere outside of the modal content
+        window.addEventListener('click', (event) => {
+            if (event.target == deleteModal) {
+                deleteModal.style.display = 'none';
+            }
+        });
+    </script>
+    {% endif %}
 
     <p class="author-credit">Authored by stancld</p>
 

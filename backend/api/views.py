@@ -213,26 +213,45 @@ def index_view(request: HttpRequest) -> HttpResponse:
 	return render(request, "index.html", context)
 
 
-@api_view(["GET"])
-@permission_classes([IsAuthenticated])
-def user_profile(request: Request) -> Response:
-	"""Returns basic profile info for the authenticated user."""
-	user = request.user
-	api_token = None
-	if request.auth:
-		api_token = request.auth.key
+class ProfileView(APIView):
+	permission_classes = [IsAuthenticated]
 
-	return Response(
-		{
-			"username": user.username,
-			"first_name": user.first_name,
-			"last_name": user.last_name,
-			"strava_id": user.strava_profile.strava_id
-			if hasattr(user, "strava_profile")
-			else None,
-			"api_token": api_token,
-		}
-	)
+	def get(self, request: Request) -> Response:
+		"""Returns basic profile info for the authenticated user."""
+		user = request.user
+		api_token = None
+		if request.auth:
+			api_token = request.auth.key
+
+		return Response(
+			{
+				"username": user.username,
+				"first_name": user.first_name,
+				"last_name": user.last_name,
+				"strava_id": user.strava_profile.strava_id
+				if hasattr(user, "strava_profile")
+				else None,
+				"api_token": api_token,
+			}
+		)
+
+	def delete(self, request: Request) -> Response:
+		"""Delete the user's account and associated data."""
+		try:
+			user = request.user
+			# The on_delete=models.CASCADE on the StravaUser.user field will handle
+			# deleting the associated StravaUser, HR data, config etc.
+			user.delete()
+			return Response(
+				{"message": "Account deleted successfully."},
+				status=status.HTTP_204_NO_CONTENT,
+			)
+		except Exception as e:
+			logger.error(f"Error deleting account for user {request.user.id}: {e}")
+			return Response(
+				{"error": "An error occurred during account deletion."},
+				status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+			)
 
 
 @api_view(["GET"])
