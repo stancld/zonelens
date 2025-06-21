@@ -360,7 +360,7 @@ class StravaApiClient:
 			response = self.get(
 				url=STRAVA_API_STREAMS_URL_TEMPLATE.format(activity_id=activity_id),
 				access_token=self.access_token,
-				params={"keys": "heartrate,time", "key_by_type": "true"},
+				params={"keys": "heartrate,time,distance,moving", "key_by_type": "true"},
 			)
 			response.raise_for_status()  # Raise HTTPError for bad responses (4XX or 5XX)
 			return response.json()
