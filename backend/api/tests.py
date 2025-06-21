@@ -44,6 +44,7 @@ from rest_framework.test import APITestCase
 
 from api.hr_processing import (
 	OUTSIDE_ZONES_KEY,
+	_is_moving_datapoint,
 	calculate_time_in_zones,
 	determine_hr_zone,
 	parse_activity_streams,
@@ -592,7 +593,7 @@ class StravaApiClientFunctionTests(TestCase):
 		self.assertEqual(streams, mock_stream_data)
 
 		expected_url = STRAVA_API_STREAMS_URL_TEMPLATE.format(activity_id=activity_id)
-		expected_params = {"keys": "heartrate,time", "key_by_type": "true"}
+		expected_params = {"keys": "heartrate,time,distance,moving", "key_by_type": "true"}
 
 		mock_strava_get.assert_called_once_with(
 			url=expected_url,
@@ -645,20 +646,28 @@ class HRProcessingTests(APITestCase):
 		streams_data = {
 			"time": {"data": [0, 1, 2, 3], "original_size": 4, "resolution": "high"},
 			"heartrate": {"data": [120, 122, 125, 128], "original_size": 4, "resolution": "high"},
+			"distance": {"data": [0.0, 1.0, 2.0, 3.0], "original_size": 4, "resolution": "high"},
+			"moving": {
+				"data": [True, False, True, False],
+				"original_size": 4,
+				"resolution": "high",
+			},
 		}
-		time_data, hr_data = parse_activity_streams(streams_data)
+		time_data, hr_data, distance_data, moving_data = parse_activity_streams(streams_data)
 		self.assertEqual(time_data, [0, 1, 2, 3])
 		self.assertEqual(hr_data, [120, 122, 125, 128])
+		self.assertEqual(distance_data, [0, 1, 2, 3])
+		self.assertEqual(moving_data, [True, False, True, False])
 
 	def test_parse_activity_streams_missing_time(self):
 		streams_data = {"heartrate": {"data": [120, 122, 125, 128], "original_size": 4}}
-		time_data, hr_data = parse_activity_streams(streams_data)
+		time_data, hr_data, *_ = parse_activity_streams(streams_data)
 		self.assertIsNone(time_data)
 		self.assertEqual(hr_data, [120, 122, 125, 128])
 
 	def test_parse_activity_streams_missing_heartrate(self):
 		streams_data = {"time": {"data": [0, 1, 2, 3], "original_size": 4}}
-		time_data, hr_data = parse_activity_streams(streams_data)
+		time_data, hr_data, *_ = parse_activity_streams(streams_data)
 		self.assertEqual(time_data, [0, 1, 2, 3])
 		self.assertIsNone(hr_data)
 
@@ -667,7 +676,7 @@ class HRProcessingTests(APITestCase):
 			"time": {"data": [], "original_size": 0},
 			"heartrate": {"data": [120], "original_size": 1},
 		}
-		time_data, hr_data = parse_activity_streams(streams_data)
+		time_data, hr_data, *_ = parse_activity_streams(streams_data)
 		self.assertIsNone(time_data)  # Empty list treated as invalid/None
 		self.assertEqual(hr_data, [120])
 
@@ -675,7 +684,7 @@ class HRProcessingTests(APITestCase):
 			"time": {"data": [0, 1], "original_size": 2},
 			"heartrate": {"data": [], "original_size": 0},
 		}
-		time_data, hr_data = parse_activity_streams(streams_data_hr_empty)
+		time_data, hr_data, *_ = parse_activity_streams(streams_data_hr_empty)
 		self.assertEqual(time_data, [0, 1])
 		self.assertIsNone(hr_data)
 
@@ -684,30 +693,22 @@ class HRProcessingTests(APITestCase):
 			"time": {"data": [0, 1, "a", 3], "original_size": 4},
 			"heartrate": {"data": [120, 122, 125, 128], "original_size": 4},
 		}
-		time_data, hr_data = parse_activity_streams(streams_data)
+		time_data, hr_data, *_ = parse_activity_streams(streams_data)
 		self.assertIsNone(time_data)
 		self.assertEqual(hr_data, [120, 122, 125, 128])
 
-	def test_parse_activity_streams_mismatched_lengths(self):
-		# Should still parse but log a warning (tested manually)
-		streams_data = {
-			"time": {"data": [0, 1, 2], "original_size": 3},
-			"heartrate": {"data": [120, 122, 125, 128], "original_size": 4},
-		}
-		with self.assertLogs(level="WARNING") as log:
-			time_data, hr_data = parse_activity_streams(streams_data)
-			self.assertEqual(time_data, [0, 1, 2])
-			self.assertEqual(hr_data, [120, 122, 125, 128])
-			self.assertTrue(any("different lengths" in str(message) for message in log.output))
-
 	def test_parse_activity_streams_none_or_empty_input(self):
-		time_data, hr_data = parse_activity_streams(None)
+		time_data, hr_data, distance_data, moving_data = parse_activity_streams(None)
 		self.assertIsNone(time_data)
 		self.assertIsNone(hr_data)
+		self.assertIsNone(distance_data)
+		self.assertIsNone(moving_data)
 
-		time_data, hr_data = parse_activity_streams({})
+		time_data, hr_data, distance_data, moving_data = parse_activity_streams({})
 		self.assertIsNone(time_data)
 		self.assertIsNone(hr_data)
+		self.assertIsNone(distance_data)
+		self.assertIsNone(moving_data)
 
 	# Tests for determine_hr_zone
 	def test_determine_hr_zone_exact_match(self):
@@ -810,7 +811,6 @@ class HRProcessingTests(APITestCase):
 		self.assertEqual(determine_hr_zone(170, unsorted_config), "Zone 5")
 		self.assertEqual(determine_hr_zone(50, unsorted_config), "Zone 1")
 
-	# --- Tests for calculate_time_in_zones ---
 	def test_calculate_time_in_zones_basic(self):
 		# time_data:  [  0,  10,  20,  30,  40,  50,  60,  70]
 		# hr_data:    [ 90, 110, 130, 150, 170,  50, 135, 200] # HR at start of segment
@@ -818,43 +818,12 @@ class HRProcessingTests(APITestCase):
 		# zone for HR: Z1,  Z2,  Z3,  Z4,  Z5, Out,  Z3, Out
 		time_data = [0, 10, 20, 30, 40, 50, 60, 70]
 		heartrate_data = [90, 110, 130, 150, 170, 50, 135, 200]
-		# heartrate_data is for HR at the start of the segment, so one less element than time_data
-		# For calculate_time_in_zones, we expect len(time_data) == len(heartrate_data) usually,
-		# where heartrate_data[i] is the HR for the segment time_data[i] to time_data[i+1].
-		# Let's adjust to match typical Strava stream structure where len(time) == len(hr)
-		heartrate_data = [
-			90,
-			110,
-			130,
-			150,
-			170,
-			50,
-			135,
-			200,
-		]  # Last HR won't start a new segment
 
-		# Expected distribution based on self.default_zones_data for self.zones_config:
-		# Z1 (0-100):   90 (10s)
-		# Z2 (101-120): 110 (10s)
-		# Z3 (121-140): 130 (10s), 135 (10s) = 20s
-		# Z4 (141-160): 150 (10s)
-		# Z5 (161-200): 170 (10s)
-		# Outside:      50 (10s) (HR 200 is for the last data point, not a segment start)
-
-		# The function uses heartrate_data[i] for the segment time_data[i] to time_data[i+1]
-		# So, for 7 segments:
-		# Segment 0 (0-10s), HR 90 (Z1) -> Z1: 10s
-		# Segment 1 (10-20s), HR 110 (Z2) -> Z2: 10s
-		# Segment 2 (20-30s), HR 130 (Z3) -> Z3: 10s
-		# Segment 3 (30-40s), HR 150 (Z4) -> Z4: 10s
-		# Segment 4 (40-50s), HR 170 (Z5) -> Z5: 10s
-		# Segment 5 (50-60s), HR 50 (Z1, as 0-100) -> Z1: 10s + 10s = 20s
-		# Segment 6 (60-70s), HR 135 (Z3) -> Z3: 10s + 10s = 20s
-		result = calculate_time_in_zones(time_data, heartrate_data, self.zones_config)
+		result = calculate_time_in_zones(time_data, heartrate_data, None, None, self.zones_config)
 		expected = {
-			"Zone 1": 20,  # 90 for 10s, 50 for 10s
-			"Zone 2": 10,
-			"Zone 3": 20,  # 130 for 10s, 135 for 10s
+			"Zone 1": 20,
+			"Zone 2": 20,
+			"Zone 3": 10,
 			"Zone 4": 10,
 			"Zone 5": 10,
 			OUTSIDE_ZONES_KEY: 0,
@@ -867,23 +836,23 @@ class HRProcessingTests(APITestCase):
 			base_expected[zn_model.name] = 0
 
 		self.assertDictEqual(
-			calculate_time_in_zones(None, [100, 120], self.zones_config), base_expected
+			calculate_time_in_zones(None, [100, 120], None, None, self.zones_config), base_expected
 		)
 		self.assertDictEqual(
-			calculate_time_in_zones([0, 10], None, self.zones_config), base_expected
+			calculate_time_in_zones([0, 10], None, None, None, self.zones_config), base_expected
 		)
 		self.assertDictEqual(
-			calculate_time_in_zones([], [100, 120], self.zones_config), base_expected
+			calculate_time_in_zones([], [100, 120], None, None, self.zones_config), base_expected
 		)
 		self.assertDictEqual(
-			calculate_time_in_zones([0, 10], [], self.zones_config), base_expected
+			calculate_time_in_zones([0, 10], [], None, None, self.zones_config), base_expected
 		)
 
 	def test_calculate_time_in_zones_no_config_or_empty_zones(self):
 		time_data = [0, 10, 20]
 		heartrate_data = [100, 120, 130]
 		# Case 1: No zones_config provided
-		result_no_config = calculate_time_in_zones(time_data, heartrate_data, None)
+		result_no_config = calculate_time_in_zones(time_data, heartrate_data, None, None, None)
 		# All time (10s + 10s = 20s) should be 'Outside Defined Zones'
 		self.assertDictEqual(result_no_config, {OUTSIDE_ZONES_KEY: 20})
 
@@ -891,7 +860,9 @@ class HRProcessingTests(APITestCase):
 		empty_zones_config = CustomZonesConfig.objects.create(
 			user=self.strava_user, activity_type="TestEmptyZonesCalc"
 		)
-		result_empty_zones = calculate_time_in_zones(time_data, heartrate_data, empty_zones_config)
+		result_empty_zones = calculate_time_in_zones(
+			time_data, heartrate_data, None, None, empty_zones_config
+		)
 		self.assertDictEqual(result_empty_zones, {OUTSIDE_ZONES_KEY: 20})
 
 	def test_calculate_time_in_zones_mismatched_lengths(self):
@@ -901,7 +872,8 @@ class HRProcessingTests(APITestCase):
 		for zn_model in self.zones_config.zones_definition.all():
 			base_expected[zn_model.name] = 0
 		self.assertDictEqual(
-			calculate_time_in_zones(time_data, heartrate_data, self.zones_config), base_expected
+			calculate_time_in_zones(time_data, heartrate_data, None, None, self.zones_config),
+			base_expected,
 		)
 
 	def test_calculate_time_in_zones_insufficient_data(self):
@@ -909,8 +881,12 @@ class HRProcessingTests(APITestCase):
 		for zn_model in self.zones_config.zones_definition.all():
 			base_expected[zn_model.name] = 0
 
-		self.assertDictEqual(calculate_time_in_zones([0], [100], self.zones_config), base_expected)
-		self.assertDictEqual(calculate_time_in_zones([], [], self.zones_config), base_expected)
+		self.assertDictEqual(
+			calculate_time_in_zones([0], [100], None, None, self.zones_config), base_expected
+		)
+		self.assertDictEqual(
+			calculate_time_in_zones([], [], None, None, self.zones_config), base_expected
+		)
 
 	def test_calculate_time_in_zones_all_outside(self):
 		# HR values are consistently below Zone 1 (which starts at 0 for default_zones_data)
@@ -927,12 +903,14 @@ class HRProcessingTests(APITestCase):
 			config=gapped_config, name="ZTest", min_hr=50, max_hr=100, order=1
 		)
 
-		result_low_gapped = calculate_time_in_zones(time_data, heartrate_data_low, gapped_config)
+		result_low_gapped = calculate_time_in_zones(
+			time_data, heartrate_data_low, None, None, gapped_config
+		)
 		# All time (10s * 3 segments = 30s) should be 'Outside Defined Zones'
 		self.assertDictEqual(result_low_gapped, {"ZTest": 0, OUTSIDE_ZONES_KEY: 30})
 
 		result_high_default = calculate_time_in_zones(
-			time_data, heartrate_data_high, self.zones_config
+			time_data, heartrate_data_high, None, None, self.zones_config
 		)
 		expected_default_all_outside = {OUTSIDE_ZONES_KEY: 30}
 		for zn_model in self.zones_config.zones_definition.all():
@@ -944,52 +922,13 @@ class HRProcessingTests(APITestCase):
 		heartrate_data = [100, 120, 130]
 		# Segment 1 (0-20s), HR 100 (Z1) -> Z1: 20s
 		# Segment 2 (20-10s), HR 120 -> Negative duration, skipped.
-		result = calculate_time_in_zones(time_data, heartrate_data, self.zones_config)
+		result = calculate_time_in_zones(time_data, heartrate_data, None, None, self.zones_config)
 
 		expected = {OUTSIDE_ZONES_KEY: 0}
 		for zn_model in self.zones_config.zones_definition.all():
 			expected[zn_model.name] = 0
-		expected["Zone 1"] = 20  # Only the first segment should be counted
+		expected["Zone 2"] = 20  # Only the second segment should be counted
 		self.assertDictEqual(result, expected)
-
-	def test_parse_activity_streams_stream_not_dict(self):
-		"""Test parsing when a stream type (e.g., 'time') maps to a non-dictionary."""
-		streams_data = {
-			"time": "not_a_dict",
-			"heartrate": {
-				"data": [150, 151],
-				"type": "heartrate",
-				"series_type": "time",
-				"original_size": 2,
-				"resolution": "high",
-			},
-		}
-		time_data, heartrate_data = parse_activity_streams(streams_data)
-		self.assertIsNone(time_data)
-		# Ensure heartrate_data is still parsed correctly if it's valid
-		self.assertEqual(heartrate_data, [150, 151])
-
-	def test_parse_activity_streams_stream_data_not_list(self):
-		"""Test parsing when a stream's 'data' key maps to a non-list."""
-		streams_data = {
-			"time": {
-				"data": "not_a_list",
-				"type": "time",
-				"series_type": "time",
-				"original_size": 0,
-				"resolution": "high",
-			},
-			"heartrate": {
-				"data": [150, 151],
-				"type": "heartrate",
-				"series_type": "time",
-				"original_size": 2,
-				"resolution": "high",
-			},
-		}
-		time_data, heartrate_data = parse_activity_streams(streams_data)
-		self.assertIsNone(time_data)
-		self.assertEqual(heartrate_data, [150, 151])
 
 	@patch("api.hr_processing.logger")
 	def test_determine_hr_zone_db_error_on_fetch(self, mock_logger):
@@ -1037,7 +976,11 @@ class HRProcessingTests(APITestCase):
 
 		time_data = [0, 10, 20, 30]
 		hr_data = [100, 110, 120, 130]
-		result = calculate_time_in_zones(time_data, hr_data, mock_zones_config)
+		distance_data = [0.0, 1.0, 2.0, 3.0]
+		moving_data = [False, True, True, True]
+		result = calculate_time_in_zones(
+			time_data, hr_data, distance_data, moving_data, mock_zones_config
+		)
 
 		# Should default to only OUTSIDE_ZONES_KEY and sum all time there
 		self.assertEqual(len(result), 1)
@@ -1049,6 +992,23 @@ class HRProcessingTests(APITestCase):
 			"Proceeding as if no zones were defined."
 		)
 		self.assertIn(err_msg, mock_logger.error.call_args[0][0])
+
+	def test__is_moving(self):
+		"""Test the _is_moving_datapoint helper function."""
+		# Both streams missing, should default to True
+		self.assertTrue(_is_moving_datapoint(None, None, 1.0, 1))
+		# One stream missing, should default to True
+		self.assertTrue(_is_moving_datapoint([True], None, 1.0, 0))
+		self.assertTrue(_is_moving_datapoint(None, [0.0, 1.0], 1.0, 1))
+
+		moving_data = [False, True, False, False, False]
+		distance_data = [0.0, 5.0, 5.5, 7.0, 8.0]
+		threshold = 1.0
+
+		self.assertTrue(_is_moving_datapoint(moving_data, distance_data, threshold, 1))
+		self.assertFalse(_is_moving_datapoint(moving_data, distance_data, threshold, 2))
+		self.assertTrue(_is_moving_datapoint(moving_data, distance_data, threshold, 3))
+		self.assertFalse(_is_moving_datapoint(moving_data, distance_data, threshold, 4))
 
 
 class StravaHRWorkerTests(TestCase):

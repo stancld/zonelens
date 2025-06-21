@@ -321,7 +321,7 @@ class ActivityZoneTimes(models.Model):
 
 def get_default_processing_start_time() -> datetime:
 	"""Return the default start time for activity processing."""
-	return timezone.make_aware(datetime(2025, 1, 1)) - timedelta(days=1)
+	return timezone.make_aware(datetime(2025, 6, 1)) - timedelta(days=1)
 
 
 class ActivityProcessingQueue(models.Model):

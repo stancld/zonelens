@@ -1,5 +1,5 @@
 # Lessons Learned While Experimenting with Windsurf, Claude Sonnet 3.7, and Gemini 2.5 Pro
-This guide outlines practical tips and best practices for working effectively with LLM-based coding assistants. These insights are drawn from hands-on experience building Stridely and experimenting with models like Windsurf, Claude Sonnet 3.7, and Gemini 2.5 Pro.
+This guide outlines practical tips and best practices for working effectively with LLM-based coding assistants. These insights are drawn from hands-on experience building ZoneLens and experimenting with models like Windsurf, Claude 3.5/3.7 Sonnet, and Gemini 2.5 Pro.
 
 ## Git Is Your Best Friend
 Large Language Models (LLMs) are excellent at generating large volumes of code quickly. However, they can unintentionally modify existing logic or introduce regressions. Robust version control is essential.
@@ -83,11 +83,18 @@ LLMs often introduce unnecessary complexity. Stay focused on core functionality 
 
 ## LLM Collaboration Nuances
 
-When working with LLMs (e.g., Gemini 2.5 Pro, Claude 3 Sonnet) on intricate code modifications, such as adjusting specific filter conditions within a complex method, they may sometimes propose larger-scale refactors rather than small, surgical changes. These expansive refactors can often be perplexing, creating unnecessary mess and potentially breaking existing functionality. For such fine-grained adjustments, it is frequently more effective to leverage one's own coding expertise to make the precise change, or to guide the LLM with very specific, constrained instructions. This highlights the importance of human oversight and a critical approach when pair-programming with AI, especially for delicate modifications in an existing codebase.
+When working with LLMs (e.g., Gemini 1.5 Pro, Claude 3.5 Sonnet) on intricate code modifications, such as adjusting specific filter conditions within a complex method, they may propose larger-scale refactors instead of small, surgical changes. These expansive refactors can be perplexing, create unnecessary mess, and break existing functionality. For such fine-grained adjustments, it is often more effective to use one's own expertise for the precise change or to guide the LLM with specific, constrained instructions. This highlights the importance of human oversight and a critical approach when pair-programming with AI, especially for delicate modifications in an existing codebase.
 
-**Django Forms and LLMs:** Generating well-functioning Django forms with LLMs can be particularly frustrating. It usually leads to breaking a ton of stuff and circulating in a vicious circle. This highlights a specific area where LLM assistance requires extreme caution and often more manual intervention.
+**Django Forms and LLMs:** Generating well-functioning Django forms with LLMs can be particularly frustrating. It usually leads to breaking a ton of stuff and getting stuck in a vicious circle. This highlights a specific area where LLM assistance requires extreme caution and often more manual intervention.
+
+
+## LLM is sometimes surprisingly dumb
+
+An LLM is sometimes surprisingly dumb when a project's scope is bigger. When changing the HR calculation from elapsed time to moving time, the LLM managed to break the code three times and was unable to deliver any working results.
+Even though this action required minimal code changes, the LLM failed spectacularly. Very disappointing.
+
 
 ## Final Thoughts
-Effective LLM-assisted development is a skill — one that improves with experience. By applying structured workflows, clear communication, and a collaborative mindset, you can get the most out of tools like Claude Sonnet, Gemini, and Windsurf.
+Effective LLM-assisted development is a skill—one that improves with experience. By applying structured workflows, clear communication, and a collaborative mindset, you can get the most out of tools like Claude 3.5/3.7 Sonnet, Gemini 2.5 Pro, and Windsurf.
 
 Co-authored with a free-tier OpenAI ChatGPT.

@@ -62,7 +62,7 @@ class Worker:
 		self.strava_client = StravaApiClient(self.user)
 		self.logger = get_logger(__name__)
 
-	def process_user_activities(  # noqa: C901
+	def process_user_activities(
 		self, after_timestamp: int | None = None, limit: int = 10
 	) -> tuple[int | None, bool, int]:
 		"""Process user activities in bulk after the account setup.
@@ -144,11 +144,9 @@ class Worker:
 				)
 				continue
 
-			time_data, hr_data = parse_activity_streams(streams_data)
-			if not time_data or not hr_data:
-				continue
-
-			zone_times_dict = calculate_time_in_zones(time_data, hr_data, selected_zones_config)
+			zone_times_dict = calculate_time_in_zones(
+				*parse_activity_streams(streams_data), selected_zones_config
+			)
 			if time_outside_zone := zone_times_dict.pop(OUTSIDE_ZONES_KEY, 0):
 				self.logger.warning(
 					f"There is {time_outside_zone} s outside any zone for activity {activity_id}."
@@ -199,8 +197,9 @@ class Worker:
 		if not (streams_data := self.strava_client.fetch_activity_streams(activity_id)):
 			raise ValueError(f"Failed to fetch stream for activity {activity_id}.")
 
-		time_data, hr_data = parse_activity_streams(streams_data)
-		zone_times_dict = calculate_time_in_zones(time_data, hr_data, selected_zones_config)
+		zone_times_dict = calculate_time_in_zones(
+			*parse_activity_streams(streams_data), selected_zones_config
+		)
 
 		if time_outside_zone := zone_times_dict.pop(OUTSIDE_ZONES_KEY, 0):
 			self.logger.warning(
