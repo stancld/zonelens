@@ -15,6 +15,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Added button routing to HR Zones config on the home screen
 - Added info panel displaying the initial sync status
 - Enabled account deletion
+- Added a toggle button to switch between time and percentage views for weekly summaries
 
 #### Changed
 - Changed time in zone calculation to be based on moving time instead of elapsed time
