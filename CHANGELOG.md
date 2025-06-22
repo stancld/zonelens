@@ -1,0 +1,34 @@
+# Changelog
+All notable changes to this project will be documented in this file. The documented versioning starts from the public alpha release `0.3.1`.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
+
+
+## [Unreleased] - YYYY-MM-DD
+
+### Public
+
+#### Added
+- Added link to the extension in Chrome store
+- Added home button to HR Zones config display
+- Added button routing to Strava calendar on the home screen
+- Added button routing to HR Zones config on the home screen
+- Added info panel displaying the initial sync status
+- Enabled account deletion
+
+#### Changed
+- Changed time in zone calculation to be based on moving time instead of elapsed time
+
+####
+- ...
+
+
+### Internal
+
+#### Added
+- Added support for separate development Chrome extension ID
+
+#### Changed
+- ...
+#### Fixed
+- Used `gunicorn.conf.py` to run APScheduler in a single process only

@@ -32,7 +32,7 @@ from urllib.parse import urlencode
 import requests
 from django.conf import settings
 from django.contrib import messages
-from django.contrib.auth import get_user_model, login
+from django.contrib.auth import get_user_model, login, logout
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.db import transaction
 from django.http import (
@@ -211,6 +211,17 @@ def index_view(request: HttpRequest) -> HttpResponse:
 		except Exception as e:
 			logger.error(f"Error fetching ActivityProcessingQueue for user {request.user.id}: {e}")
 	return render(request, "index.html", context)
+
+
+def changelog_view(request: Request) -> HttpResponse:
+	"""Renders the changelog page."""
+	return render(request, "api/changelog.html")
+
+
+def logout_view(request: Request) -> HttpResponse:
+	"""Logs the user out."""
+	logout(request)
+	return HttpResponseRedirect("/")
 
 
 class ProfileView(APIView):

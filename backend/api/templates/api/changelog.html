@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Zonelens Changelog</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #fdfdfd;
+        }
+        h1, h2, h3 {
+            color: #2c3e50;
+        }
+        h1 {
+            border-bottom: 2px solid #ecf0f1;
+            padding-bottom: 10px;
+        }
+        .version-info {
+            background-color: #e8f6f3;
+            border-left: 5px solid #1abc9c;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 5px;
+        }
+        ul {
+            list-style-type: '✅ ';
+            padding-left: 20px;
+        }
+        li {
+            margin-bottom: 10px;
+        }
+        .category {
+            font-weight: bold;
+            color: #FC4C02;
+        }
+        .home-button-container {
+            text-align: center;
+            margin-top: 30px;
+            padding-bottom: 20px;
+        }
+        .home-button {
+            background-color: #aaaaaa;
+            color: #ffffff;
+            border: 1px solid #999999;
+            padding: 8px 15px;
+            font-size: 0.9em;
+            border-radius: 5px;
+            cursor: pointer;
+            text-decoration: none;
+            transition: opacity 0.2s;
+        }
+        .home-button:hover {
+            opacity: 0.85;
+        }
+    </style>
+</head>
+<body>
+    <h1>Zonelens Changelog</h1>
+    <div class="version-info">
+        <p>Welcome to version <strong>0.4.0</strong>! We've made some exciting updates since version 0.3.1. Here’s what’s new.</p>
+    </div>
+
+    <h2>Public Changes</h2>
+
+    <h3><span class="category">Added</span></h3>
+    <ul>
+        <li>Link to the extension in Chrome store</li>
+        <li>Home button to HR Zones config display</li>
+        <li>Button routing to Strava calendar on the home screen</li>
+        <li>Button routing to HR Zones config on the home screen</li>
+        <li>Info panel displaying the initial sync status</li>
+        <li>Enabled account deletion</li>
+    </ul>
+
+    <h3><span class="category">Changed</span></h3>
+    <ul>
+        <li>Time in zone calculation is now based on moving time instead of elapsed time</li>
+    </ul>
+
+    <div class="home-button-container">
+        <a href="{% url 'index' %}" class="home-button">Home</a>
+    </div>
+
+</body>
+</html>
