@@ -133,10 +133,30 @@
         .extension-link a:hover {
             text-decoration: underline;
         }
-        .delete-account-container {
+        .changelog-button-container {
             position: fixed;
             bottom: 15px;
             left: 15px;
+            z-index: 1000;
+        }
+        .changelog-button {
+            background-color: #aaaaaa;
+            color: #ffffff;
+            border: 1px solid #999999;
+            padding: 8px 15px;
+            font-size: 0.9em;
+            border-radius: 5px;
+            cursor: pointer;
+            text-decoration: none;
+            transition: opacity 0.2s;
+        }
+        .changelog-button:hover {
+            opacity: 0.85;
+        }
+        .delete-account-container {
+            position: fixed;
+            bottom: 15px;
+            left: 125px;
             z-index: 1000;
         }
         .delete-button {
@@ -147,6 +167,9 @@
             font-size: 0.9em;
             border-radius: 5px;
             cursor: pointer;
+        }
+        .delete-button:hover {
+            opacity: 0.85;
         }
         /* Modal Styles */
         .modal {
@@ -201,18 +224,13 @@
 <body>
     <div class="container">
         <h1>Welcome to ZoneLens!</h1>
-        <div id="auth-section">
-            <p>Customize your Strava activity heart rate and power zones with ease. Connect your Strava account to get started.</p>
-            <a href="/api/auth/strava" class="strava-connect-link">
-                <img src="{% static 'images/btn_strava_connect_with_orange_x2.png' %}" alt="Login with Strava" class="strava-connect-img">
-            </a>
 
-            <p class="extension-link">Get the <a href="https://chrome.google.com/webstore/detail/zonelens/iaohacnoldkcffapjbbjfifmamcnedkk" target="_blank" rel="noopener noreferrer">ZoneLens Chrome Extension</a>.</p>
-        </div>
-
-        <div id="profile" style="display: none;">
+        {% if user.is_authenticated %}
+        <div id="profile">
             <h2>Connection Status</h2>
-            <p id="connection-status-message" style="text-align: center; font-size: 1.2em; margin-top: 20px; margin-bottom: 20px; color: #333;"></p>
+            <p id="connection-status-message" style="text-align: center; font-size: 1.2em; margin-top: 20px; margin-bottom: 20px; color: #333;">
+                Hi {{ user.first_name | default:'there' }}! You're connected. <span style="font-size: 1.5em;">🎉</span>
+            </p>
             {% if total_activities is not None %}
             <div style="text-align: center; font-size: 0.9em; margin-bottom: 15px; padding: 10px; border: 1px solid #bde5f8; background-color: #f0f8ff; color: #00529b; border-radius: 5px;">
                 Initial activity sync: <strong>{{ num_processed }}/{{ total_activities }}</strong> activities synced.
@@ -227,15 +245,24 @@
                 <a href="{% url 'user_hr_zones_display' %}" class="basic-button strava-button-override">My HR Zones</a>
             </div>
         </div>
+        {% else %}
+        <div id="auth-section">
+            <p>Customize your Strava activity heart rate and power zones with ease. Connect your Strava account to get started.</p>
+            <a href="{% url 'strava_authorize' %}" class="strava-connect-link">
+                <img src="{% static 'images/btn_strava_connect_with_orange_x2.png' %}" alt="Login with Strava" class="strava-connect-img">
+            </a>
 
-        <div id="error" style="display: none;">
-            <h2>Error</h2>
-            <p id="error-message"></p>
+            <p class="extension-link">Get the <a href="https://chrome.google.com/webstore/detail/zonelens/iaohacnoldkcffapjbbjfifmamcnedkk" target="_blank" rel="noopener noreferrer">ZoneLens Chrome Extension</a>.</p>
         </div>
+        {% endif %}
     </div>
 
     <div class="strava-logo-container">
         <a href="https://strava.com" target="_blank" rel="noopener noreferrer"><img src="{% static 'images/api_logo_pwrdBy_strava_stack_orange.png' %}" alt="Powered by Strava"></a>
+    </div>
+
+    <div class="changelog-button-container">
+        <button class="changelog-button" onclick="window.location.href='{% url 'changelog' %}'">Changelog</button>
     </div>
 
     {% if user.is_authenticated %}
@@ -322,6 +349,10 @@
     <p class="author-credit">Authored by stancld</p>
 
     <script>
+        function logout() {
+            window.location.href = "{% url 'logout' %}";
+        }
+
         function openStravaCalendar() {
             const monthShortNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
             const now = new Date();
@@ -329,75 +360,6 @@
             const stravaCalendarUrl = `https://www.strava.com/athlete/calendar#${monthShortName}`;
             window.open(stravaCalendarUrl, '_blank'); // Open in a new tab
         }
-
-        const authSection = document.getElementById('auth-section');
-        const profileSection = document.getElementById('profile');
-        const connectionStatusMessage = document.getElementById('connection-status-message'); // Changed from profileData
-        const errorSection = document.getElementById('error');
-        const errorMessage = document.getElementById('error-message');
-
-        // Function to fetch profile data using the stored token
-        async function fetchProfile(token) {
-            try {
-                const response = await fetch('/api/profile/', {
-                    headers: {
-                        'Authorization': `Token ${token}`,
-                        'Accept': 'application/json'
-                    }
-                });
-
-                if (response.ok) {
-                    const data = await response.json();
-                    if (data.first_name) {
-                    connectionStatusMessage.innerHTML = `Hi ${data.first_name}! You're connected. <span style="font-size: 1.5em;">🎉</span>`;
-                } else {
-                    connectionStatusMessage.innerHTML = `Successfully connected to Strava! <span style="font-size: 1.5em;">🎉</span>`;
-                }
-                authSection.style.display = 'none';
-                profileSection.style.display = 'block';
-                    errorSection.style.display = 'none';
-                } else {
-                    // Handle non-OK responses (e.g., 401 Unauthorized, 403 Forbidden)
-                    const errorText = await response.text();
-                    console.error('Failed to fetch profile:', response.status, errorText);
-                    showError(`Failed to fetch profile: ${response.status}. Check console for details.`);
-                    logout(); // Clear token if it's invalid
-                }
-            } catch (error) {
-                console.error('Network error fetching profile:', error);
-                showError('Network error fetching profile. Is the backend server running?');
-                logout();
-            }
-        }
-
-        // Function to display errors
-        function showError(message) {
-            errorMessage.textContent = message;
-            errorSection.style.display = 'block';
-            profileSection.style.display = 'none';
-            authSection.style.display = 'block'; // Show login button again
-        }
-
-        // Function to logout (clear token and refresh)
-        function logout() {
-            localStorage.removeItem('authToken');
-            profileSection.style.display = 'none';
-            authSection.style.display = 'block';
-            errorSection.style.display = 'none';
-            // Optionally redirect or just update UI
-            // window.location.reload();
-        }
-
-        // Check for token on page load
-        window.onload = () => {
-            const token = localStorage.getItem('authToken');
-            if (token) {
-                fetchProfile(token);
-            } else {
-                authSection.style.display = 'block';
-                profileSection.style.display = 'none';
-            }
-        };
     </script>
 
 </body>
