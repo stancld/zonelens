@@ -25,7 +25,6 @@ RUN ./tools/install_python.sh
 COPY pyproject.toml .
 COPY constraints.txt .
 
-# Install dependencies directly into the virtual environment
 RUN uv pip install -e '.[dev]' -c constraints.txt
 
 # Copy application code

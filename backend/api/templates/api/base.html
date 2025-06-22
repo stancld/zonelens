@@ -9,6 +9,7 @@
     <link rel="apple-touch-icon" href="{% static 'images/apple-touch-icon.png' %}">
     <link rel="icon" type="image/png" sizes="192x192" href="{% static 'images/icon-192.png' %}">
     <link rel="icon" type="image/png" sizes="512x512" href="{% static 'images/icon-512.png' %}">
+    <link rel="stylesheet" href="{% static 'css/buttons.css' %}">
 
     <title>{% block title %}My Strava App{% endblock %}</title>
     <style>
@@ -56,8 +57,7 @@
         }
         nav ul li a:hover {
             background-color: #111;
-        }
-    </style>
+        }    </style>
     {% block head_extra %}{% endblock %}
 </head>
 <body>

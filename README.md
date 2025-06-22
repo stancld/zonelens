@@ -21,7 +21,7 @@
     <img src="https://img.shields.io/website?url=https://www.strava-zones.com&up_message=online&down_message=offline&label=web" alt="Website Status"/>
   </a>
   <img src="https://img.shields.io/badge/python-3.13-blue" alt="Python 3.13"/>
-  <img src="https://img.shields.io/badge/Version-v0.3.1-orange" alt="Version v0.3.1"/>
+  <img src="https://img.shields.io/badge/Version-v0.3.5-orange" alt="Version v0.3.5"/>
   <a href="LICENSE">
     <img src="https://img.shields.io/badge/license-MIT-green" alt="License: MIT"/>
   </a>
@@ -136,7 +136,10 @@ This project uses Docker for easier setup and consistent development environment
 **Authentication Endpoints:**
 *   `GET /api/auth/strava/`: Initiates the Strava OAuth2 authentication flow.
 *   `GET /api/auth/strava/callback/`: Handles the OAuth2 callback from Strava after user authorization.
+
+**User Profile Endpoints:**
 *   `GET /api/profile/`: Retrieves the authenticated user's profile information. (Requires authentication)
+*   `DELETE /api/profile/delete/`: Deletes the authenticated user's account and all associated data. (Requires authentication)
 
 **Data Synchronization & Webhook Endpoints:**
 *   `POST /api/strava/sync-activities/`: Triggers a synchronization of the user's recent activities from Strava. (Requires authentication)

@@ -1,9 +1,11 @@
 {% extends "api/base.html" %}
 {% load static %}
+<link rel="stylesheet" href="{% static 'css/buttons.css' %}">
 
 {% block title %}Your Custom Heart Rate Zones{% endblock %}
 
 {% block content %}
+    <a href="{% url 'index' %}" class="basic-button home-button-position">Home</a>
     <style>
 nav {
             display: none !important; /* Hide the main navigation bar */
@@ -20,6 +22,13 @@ nav {
             color: #333333;
             font-size: 28px;
             margin-bottom: 20px;
+        }
+
+        .home-button-position {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            z-index: 1001;
         }
 
         h2 { /* Configuration heading */
@@ -182,16 +191,18 @@ nav {
             width: fit-content; /* Try to fit its content's width */
             margin-left: auto; /* Keep it centered if it doesn't fill viewport */
             margin-right: auto; /* Keep it centered if it doesn't fill viewport */
+            position: relative; /* For positioning child elements */
+            padding-bottom: 70px; /* Add space for home button */
         }
 
         .container a, p a {
-            color: #0077CC;
+            color: white;
             text-decoration: none;
             font-weight: 500;
         }
         .container a:hover, p a:hover {
-            text-decoration: underline;
-            color: #005ea6;
+            text-decoration: none;
+            color: white;
         }
         .strava-logo-container {
             position: fixed;
@@ -208,6 +219,15 @@ nav {
 
     <div class="container">
         <h1>Your Custom Heart Rate Zones</h1>
+
+        {% if total_activities is not None %}
+            <div style="text-align: center; font-size: 0.9em; margin-bottom: 15px; padding: 10px; border: 1px solid #bde5f8; background-color: #f0f8ff; color: #00529b; border-radius: 5px;">
+                Initial activity sync: <strong>{{ num_processed }}/{{ total_activities }}</strong> activities synced.
+                {% if num_processed < total_activities %}
+                    <br><span style="font-size:0.9em;">(Processing may take some time to complete. You can refresh this page for updates.)</span>
+                {% endif %}
+            </div>
+        {% endif %}
 
         {% if error_message %}
             <p class="error-message">{{ error_message }}</p>

@@ -22,21 +22,35 @@
 
 from __future__ import annotations
 
+from collections import defaultdict
 from typing import TYPE_CHECKING, Any
 
 from api.logging import get_logger
+from api.models import ActivityType
 
 if TYPE_CHECKING:
+	from collections.abc import Sequence
+
 	from api.models import CustomZonesConfig
 
 logger = get_logger(__name__)
 
 OUTSIDE_ZONES_KEY = "Time Outside Defined Zones"
+# Kind of arbitrary constant to match Strava calculation as much as possible
+# Strava algorithm is for sure different, but this is our nice poor man's solution
+MOVING_DISTANCE_THRESHOLDS = defaultdict(
+	lambda: 0.8,
+	{
+		ActivityType.RIDE: 3.0,
+		ActivityType.RUN: 2.0,
+		ActivityType.DEFAULT: 0.8,
+	},
+)
 
 
 def parse_activity_streams(
 	streams_data: dict[str, Any] | None,
-) -> tuple[list[int] | None, list[int] | None]:
+) -> tuple[list[int] | None, list[int] | None, list[float] | None, list[bool] | None]:
 	"""Parse the raw activity stream data from Strava to extract time and heart rate series.
 
 	Parameters
@@ -51,30 +65,32 @@ def parse_activity_streams(
 		Time series in seconds, or None if not found or invalid.
 	heartrate_data
 		Heart rate series in bpm, or None if not found or invalid.
+	distance_data
+		Distance series in meters, or None if not found or invalid.
+	moving_data
+		Moving data series, or None if not found or invalid.
 	"""
 	if not streams_data:
 		logger.warning("No stream data provided to parse.")
-		return None, None
+		return None, None, None, None
 
 	time_data = _parse_activity_stream(streams_data, "time")
 	heartrate_data = _parse_activity_stream(streams_data, "heartrate")
+	distance_data = _parse_activity_stream(streams_data, "distance", float)
+	moving_data = _parse_activity_stream(streams_data, "moving", bool)
 
-	if time_data and heartrate_data and len(time_data) != len(heartrate_data):
-		logger.warning(
-			f"Time stream (len {len(time_data)}) and heartrate stream (len {len(heartrate_data)}) "
-			"have different lengths. This might indicate an issue with the data."
-		)
-
-	return time_data, heartrate_data
+	return time_data, heartrate_data, distance_data, moving_data  # type: ignore[return-value]
 
 
-def _parse_activity_stream(data_streams: dict[str, Any], stream_type: str) -> list[int] | None:
+def _parse_activity_stream(
+	data_streams: dict[str, Any], stream_type: str, expected_type: type[bool | int | float] = int
+) -> list[int] | list[bool] | list[float] | None:
 	stream = data_streams.get(stream_type)
 	if isinstance(stream, dict) and isinstance(stream.get("data"), list):
 		if not (data := stream["data"]):
 			logger.warning(f"{stream_type.capitalize()} stream data array is empty.")
 			return None
-		if not all(isinstance(t, int) for t in data):
+		if not all(isinstance(t, expected_type) for t in data):
 			logger.warning(f"{stream_type.capitalize()} stream data contains non-integer values.")
 			return None
 		return data
@@ -127,6 +143,8 @@ def determine_hr_zone(hr_value: int, zones_config: CustomZonesConfig | None) -> 
 def calculate_time_in_zones(
 	time_data: list[int] | None,
 	heartrate_data: list[int] | None,
+	distance_data: list[float] | None,
+	moving_data: list[bool] | None,
 	zones_config: CustomZonesConfig | None,
 ) -> dict[str, int]:
 	"""Calculate the total time spent in each custom heart rate zone for an activity.
@@ -137,6 +155,10 @@ def calculate_time_in_zones(
 	    A list of integers representing the time series in seconds (sorted).
 	heartrate_data
 	    A list of integers representing the heart rate series in bpm.
+	distance_data
+		A list of floats representing the distance series in meters.
+	moving_data
+	    A list of booleans representing whether the activity was moving at each time point.
 	zones_config
 	    The CustomZonesConfig object containing the zone definitions.
 
@@ -179,16 +201,34 @@ def calculate_time_in_zones(
 		logger.info("Insufficient data points (need at least 2) to calculate time in zones.")
 		return time_spent_in_zones
 
-	for i in range(len(time_data) - 1):
-		hr_value = heartrate_data[i]
-		if (duration_seconds := time_data[i + 1] - time_data[i]) <= 0:
+	moving_threshold = MOVING_DISTANCE_THRESHOLDS[
+		zones_config.activity_type if zones_config is not None else ActivityType.DEFAULT
+	]
+	for idx in range(1, len(heartrate_data)):
+		# Skip non-moving times if data available
+		if not _is_moving_datapoint(moving_data, distance_data, moving_threshold, idx):
 			continue
 
-		if zone_name := determine_hr_zone(hr_value, zones_config):
-			time_spent_in_zones[zone_name] = (
-				time_spent_in_zones.get(zone_name, 0) + duration_seconds
-			)
+		if (duration := time_data[idx] - time_data[idx - 1]) <= 0:
+			continue
+
+		# Take the average of the current and previous heart rate data points
+		heart_rate = round((heartrate_data[idx] + heartrate_data[idx - 1]) / 2)
+		if zone_name := determine_hr_zone(heart_rate, zones_config):
+			time_spent_in_zones[zone_name] = time_spent_in_zones.get(zone_name, 0) + duration
 		else:
-			time_spent_in_zones[OUTSIDE_ZONES_KEY] += duration_seconds
+			time_spent_in_zones[OUTSIDE_ZONES_KEY] += duration
 
 	return time_spent_in_zones
+
+
+def _is_moving_datapoint(
+	moving_data: Sequence[bool] | None,
+	distance_data: Sequence[float] | None,
+	moving_threshold: float,
+	idx: int,
+) -> bool:
+	# Cannot evaluate if moving/distance data are not available
+	if not (moving_data and distance_data):
+		return True
+	return moving_data[idx] or (distance_data[idx] - distance_data[idx - 1] > moving_threshold)

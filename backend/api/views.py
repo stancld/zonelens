@@ -22,6 +22,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import json
 import logging
 from datetime import datetime
@@ -31,7 +32,7 @@ from urllib.parse import urlencode
 import requests
 from django.conf import settings
 from django.contrib import messages
-from django.contrib.auth import get_user_model, login
+from django.contrib.auth import get_user_model, login, logout
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.db import transaction
 from django.http import (
@@ -58,8 +59,10 @@ from api.models import (
 	HeartRateZone,
 	StravaUser,
 	ZoneSummary,
+	get_default_processing_start_time,
 )
 from api.serializers import CustomZonesConfigSerializer, ZoneSummarySerializer
+from api.strava_client import StravaApiClient
 from api.utils import determine_weeks_in_month, encrypt_data
 from api.worker import Worker
 
@@ -195,29 +198,91 @@ def _generate_token_payload(code: str) -> dict:
 
 def index_view(request: HttpRequest) -> HttpResponse:
 	"""Serves the main index.html template."""
-	return render(request, "index.html")
+	context = {}
+	if request.user.is_authenticated:
+		try:
+			queue_entry = ActivityProcessingQueue.objects.get(user__user=request.user)
+			# Only show status if total_activities is known (not None)
+			if queue_entry.total_activities is not None:
+				context["num_processed"] = queue_entry.num_processed
+				context["total_activities"] = queue_entry.total_activities
+		except ActivityProcessingQueue.DoesNotExist:
+			pass  # No queue entry, nothing to add to context
+		except Exception as e:
+			logger.error(f"Error fetching ActivityProcessingQueue for user {request.user.id}: {e}")
+	return render(request, "index.html", context)
+
+
+def changelog_view(request: Request) -> HttpResponse:
+	"""Renders the changelog page."""
+	return render(request, "api/changelog.html")
+
+
+def logout_view(request: Request) -> HttpResponse:
+	"""Logs the user out."""
+	logout(request)
+	return HttpResponseRedirect("/")
+
+
+class ProfileView(APIView):
+	permission_classes = [IsAuthenticated]
+
+	def get(self, request: Request) -> Response:
+		"""Returns basic profile info for the authenticated user."""
+		user = request.user
+		api_token = None
+		if request.auth:
+			api_token = request.auth.key
+
+		return Response(
+			{
+				"username": user.username,
+				"first_name": user.first_name,
+				"last_name": user.last_name,
+				"strava_id": user.strava_profile.strava_id
+				if hasattr(user, "strava_profile")
+				else None,
+				"api_token": api_token,
+			}
+		)
+
+	def delete(self, request: Request) -> Response:
+		"""Delete the user's account and associated data."""
+		try:
+			user = request.user
+			# The on_delete=models.CASCADE on the StravaUser.user field will handle
+			# deleting the associated StravaUser, HR data, config etc.
+			user.delete()
+			return Response(
+				{"message": "Account deleted successfully."},
+				status=status.HTTP_204_NO_CONTENT,
+			)
+		except Exception as e:
+			logger.error(f"Error deleting account for user {request.user.id}: {e}")
+			return Response(
+				{"error": "An error occurred during account deletion."},
+				status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+			)
 
 
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
-def user_profile(request: Request) -> Response:
-	"""Returns basic profile info for the authenticated user."""
+def sync_status(request: Request) -> Response:
+	"""Returns activity sync status for the authenticated user."""
 	user = request.user
-	api_token = None
-	if request.auth:
-		api_token = request.auth.key
+	data = {}
 
-	return Response(
-		{
-			"username": user.username,
-			"first_name": user.first_name,
-			"last_name": user.last_name,
-			"strava_id": user.strava_profile.strava_id
-			if hasattr(user, "strava_profile")
-			else None,
-			"api_token": api_token,
-		}
-	)
+	with contextlib.suppress(ActivityProcessingQueue.DoesNotExist):
+		strava_user = user.strava_profile
+		queue_entry = ActivityProcessingQueue.objects.get(user=strava_user)
+
+		if queue_entry.total_activities is not None:
+			data["sync_status"] = {
+				"num_processed": queue_entry.num_processed,
+				"total_activities": queue_entry.total_activities,
+			}
+
+	return Response(data)
 
 
 class CustomZonesSettingsView(generics.ListCreateAPIView):
@@ -394,6 +459,29 @@ class FetchStravaHRZonesView(APIView):
 							f"User {user_strava_profile.strava_id} added to activity processing "
 							"queue after fetching Strava HR zones."
 						)
+					try:
+						strava_api_client = StravaApiClient(user_strava_profile)
+						start_time_dt = get_default_processing_start_time()
+						start_timestamp = int(start_time_dt.timestamp())
+						activities = strava_api_client.fetch_all_strava_activities(
+							after=start_timestamp
+						)
+						if activities is not None:
+							_obj.total_activities = len(activities)
+							_obj.save(update_fields=["total_activities"])
+						else:
+							logger.warning(
+								f"Could not fetch activities to determine total for user "
+								f"{user_strava_profile.strava_id}. total_activities will be None."
+							)
+							_obj.total_activities = None  # Explicitly set to None if fetch fails
+							_obj.save(update_fields=["total_activities"])
+					except Exception as e:
+						logger.error(
+							f"Failed to count activities for user {user_strava_profile.strava_id}: {e}"  # noqa: E501
+						)
+						_obj.total_activities = None  # Ensure it's None on error
+						_obj.save(update_fields=["total_activities"])
 
 				successful_message = "Strava HR zones fetch process completed."
 				if created:
@@ -489,6 +577,19 @@ class UserHRZonesDisplayView(LoginRequiredMixin, TemplateView):
 			for choice in ActivityType  # type: ignore[attr-defined]
 			if choice != ActivityType.DEFAULT
 		]
+
+		# Add activity processing queue status
+		if user.is_authenticated and hasattr(user, "strava_profile"):
+			try:
+				queue_entry = ActivityProcessingQueue.objects.get(user=user.strava_profile)
+				if queue_entry.total_activities is not None:
+					context["num_processed"] = queue_entry.num_processed
+					context["total_activities"] = queue_entry.total_activities
+			except ActivityProcessingQueue.DoesNotExist:
+				pass  # No queue entry, nothing to add
+			except Exception as e:
+				logger.error(f"Error fetching ActivityProcessingQueue for user {user.id}: {e}")
+
 		return context
 
 	def post(self, request: HttpRequest, *args: Any, **kwargs: Any) -> HttpResponse:  # noqa: ARG002
@@ -806,6 +907,33 @@ class UserHRZonesDisplayView(LoginRequiredMixin, TemplateView):
 					logger.info(
 						f"User {strava_user.strava_id} added to activity processing queue."
 					)
+				try:
+					strava_api_client = StravaApiClient(strava_user)
+					start_time_dt = get_default_processing_start_time()
+					start_timestamp = int(start_time_dt.timestamp())
+					activities = strava_api_client.fetch_all_strava_activities(
+						after=start_timestamp
+					)
+					if activities is not None:
+						_obj.total_activities = len(activities)
+						_obj.save(update_fields=["total_activities"])
+						logger.info(
+							f"Found {len(activities)} activities to sync for user "
+							f"{strava_user.strava_id} since {start_time_dt.date()}."
+						)
+					else:
+						logger.warning(
+							f"Could not fetch activities to determine total for user "
+							f"{strava_user.strava_id}. total_activities will be None."
+						)
+						_obj.total_activities = None  # Explicitly set to None if fetch fails
+						_obj.save(update_fields=["total_activities"])
+				except Exception as e_count:
+					logger.error(
+						f"Error counting activities for user {strava_user.strava_id}: {e_count}"
+					)
+					_obj.total_activities = None  # Ensure it's None on error
+					_obj.save(update_fields=["total_activities"])
 
 		except Exception as e:
 			logger.error(f"Error creating new activity config for {activity_type_value}: {e!r}")
