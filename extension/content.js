@@ -1,6 +1,11 @@
 const MONTHLY_SUMMARY_ID = 'hr-zones-monthly-summary-container';
 const WEEKLY_SUMMARY_CLASS = 'injected-weekly-hr-summary';
 
+// --- State ---
+let showWeeklyAsPercentage = true;
+let currentMonthData = null; // To store data for re-renders
+
+
 const PRODUCTION_DOMAIN = 'https://strava-zones.com';
 const DEVELOPMENT_DOMAIN = 'https://localhost:8000';
 const IS_PRODUCTION_BUILD = true; // Set to true for production builds
@@ -119,78 +124,124 @@ function renderMonthlySummary(monthKey, data) {
     }
     contentHtml += '</div>';
     summaryContainer.innerHTML = contentHtml;
+
+    // Add toggle for weekly view
+    const toggleContainer = document.createElement('div');
+    toggleContainer.className = 'strava-zones-toggle-container';
+    toggleContainer.innerHTML = `
+        <label for="weekly-view-toggle-input" class="switch">
+            <input type="checkbox" id="weekly-view-toggle-input" ${showWeeklyAsPercentage ? 'checked' : ''}>
+            <span class="slider round"></span>
+        </label>
+        <span id="weekly-view-toggle-label"></span>
+    `;
+    summaryContainer.appendChild(toggleContainer);
+
+    const toggleInput = document.getElementById('weekly-view-toggle-input');
+    const toggleLabel = document.getElementById('weekly-view-toggle-label');
+
+    function updateToggleLabel() {
+        if (toggleLabel) {
+            toggleLabel.textContent = showWeeklyAsPercentage ? 'Weekly: by %' : 'Weekly: by time';
+        }
+    }
+
+    if (toggleInput) {
+        updateToggleLabel(); // Set initial state
+        toggleInput.addEventListener('change', (event) => {
+            showWeeklyAsPercentage = event.target.checked;
+            updateToggleLabel();
+            if (currentMonthData) {
+                renderWeeklySummaries(currentMonthData);
+            }
+        });
+    }
+
     console.log(`Monthly summary for ${monthKey} rendered.`);
 }
 
 function renderWeeklySummaries(data) {
+    // Clear previously injected weekly summaries to handle re-renders
+    document.querySelectorAll('.strava-zones-weekly-summary-cell').forEach(el => el.remove());
+
     const weekRowSelector = 'table.month-calendar.marginless tbody tr';
     const weekRows = document.querySelectorAll(weekRowSelector);
 
-    if (!weekRows.length) {
-        console.warn(`No week rows found with selector: '${weekRowSelector}'. Weekly summaries not rendered.`);
+    if (!weekRows.length || !data.weeklySummaries) {
+        console.warn('ZoneLens: Calendar week rows or weekly summaries not found for rendering.');
         return;
     }
 
-    // Dynamically generate orderedSimplifiedZoneKeys from data.zoneDefinitions
-    const simplifiedZoneKeys = Object.keys(data.zoneDefinitions || {});
-    if (simplifiedZoneKeys.length === 0) {
-        console.warn("No zone definitions found in data.zoneDefinitions for weekly summaries. Cannot render.");
-        return;
-    }
-
-    simplifiedZoneKeys.sort((a, b) => {
+    const orderedSimplifiedZoneKeys = Object.keys(data.zoneDefinitions || {}).sort((a, b) => {
         const numA = parseInt(a.replace('zone', ''), 10);
         const numB = parseInt(b.replace('zone', ''), 10);
-        return numA - numB;
+        return numB - numA; // descending
     });
-    const orderedSimplifiedZoneKeys = simplifiedZoneKeys.reverse();
 
-    weekRows.forEach((row, index) => {
-        if (data.weeklySummaries && data.weeklySummaries[index] && data.weeklySummaries[index].zone_times_seconds) {
-            const weeklyActivityZoneTimes = data.weeklySummaries[index].zone_times_seconds;
+    if (orderedSimplifiedZoneKeys.length === 0) {
+        console.warn("No zone definitions found for weekly summaries.");
+        return;
+    }
 
-            let totalWeekSeconds = 0;
-            for (const key of orderedSimplifiedZoneKeys) {
-                const actualName = data.zoneDefinitions[key];
-                if (actualName && weeklyActivityZoneTimes[actualName]) {
-                    totalWeekSeconds += weeklyActivityZoneTimes[actualName];
+    let maxSingleZoneTimeInMonth = 0;
+    if (!showWeeklyAsPercentage) {
+        for (const week of data.weeklySummaries) {
+            if (week.zone_times_seconds) {
+                for (const time of Object.values(week.zone_times_seconds)) {
+                    if (time > maxSingleZoneTimeInMonth) {
+                        maxSingleZoneTimeInMonth = time;
+                    }
                 }
             }
+        }
+    }
+
+    weekRows.forEach((row, index) => {
+        if (data.weeklySummaries[index] && data.weeklySummaries[index].zone_times_seconds) {
+            const weeklyActivityZoneTimes = data.weeklySummaries[index].zone_times_seconds;
+            const totalWeekSeconds = Object.values(weeklyActivityZoneTimes).reduce((sum, time) => sum + time, 0);
 
             if (totalWeekSeconds > 0) {
-                const panelContainer = document.createElement('div');
-                panelContainer.className = WEEKLY_SUMMARY_CLASS;
-
-                let panelHtml = '';
+                let summaryHtml = '';
                 for (const simplifiedZoneKey of orderedSimplifiedZoneKeys) {
                     const zoneNumberStr = simplifiedZoneKey.replace('zone', '');
+                    const zoneName = data.zoneDefinitions[simplifiedZoneKey] || `Zone ${zoneNumberStr}`;
+                    const timeInZone = weeklyActivityZoneTimes[zoneName] || 0;
 
-                    const actualUserDefinedName = data.zoneDefinitions[simplifiedZoneKey];
-                    const timeSeconds = actualUserDefinedName ? (weeklyActivityZoneTimes[actualUserDefinedName] || 0) : 0;
+                    const percentage = totalWeekSeconds > 0 ? (timeInZone / totalWeekSeconds) * 100 : 0;
+                    const timeFormatted = formatSecondsToHms(timeInZone);
 
-                    const percentage = totalWeekSeconds > 0 ? (timeSeconds / totalWeekSeconds) * 100 : 0;
-                    const timeFormatted = formatSecondsToHms(timeSeconds);
+                    let barWidthPercentage;
+                    if (showWeeklyAsPercentage) {
+                        barWidthPercentage = percentage;
+                    } else {
+                        barWidthPercentage = maxSingleZoneTimeInMonth > 0 ? (timeInZone / maxSingleZoneTimeInMonth) * 100 : 0;
+                    }
 
-                    panelHtml += `
-                      <div class="weekly-zone-row">
-                        <span class="weekly-zone-label">Z${zoneNumberStr}</span>
-                        <div class="weekly-zone-bar-container">
-                          <div class="weekly-zone-bar zone${zoneNumberStr}" style="width: ${percentage.toFixed(1)}%;"></div>
+                    summaryHtml += `
+                        <div class="weekly-zone-row" title="${zoneName}: ${timeFormatted}">
+                            <div class="weekly-zone-label">Z${zoneNumberStr}</div>
+                            <div class="weekly-zone-bar-container">
+                                <div class="weekly-zone-bar zone${zoneNumberStr}" style="width: ${barWidthPercentage.toFixed(1)}%;"></div>
+                            </div>
+                            <div class="weekly-zone-time-text">${timeFormatted} (${percentage.toFixed(0)}%)</div>
                         </div>
-                        <span class="weekly-zone-time-text">${timeFormatted} (${percentage.toFixed(0)}%)</span>
-                      </div>
                     `;
                 }
-                panelContainer.innerHTML = panelHtml;
 
-                // Create a new table cell (td) to hold our summary panel
-                const summaryCell = document.createElement('td');
-                summaryCell.className = 'strava-zones-weekly-summary-cell';
-                summaryCell.style.verticalAlign = 'top';
-                summaryCell.style.padding = '2px';
+                if (summaryHtml) {
+                    const panelContainer = document.createElement('div');
+                    panelContainer.className = WEEKLY_SUMMARY_CLASS;
+                    panelContainer.innerHTML = summaryHtml;
 
-                summaryCell.appendChild(panelContainer);
-                row.appendChild(summaryCell); // Add the new cell to the row (tr)
+                    const summaryCell = document.createElement('td');
+                    summaryCell.className = 'strava-zones-weekly-summary-cell';
+                    summaryCell.style.verticalAlign = 'top';
+                    summaryCell.style.padding = '2px';
+
+                    summaryCell.appendChild(panelContainer);
+                    row.appendChild(summaryCell);
+                }
             }
         }
     });
@@ -309,6 +360,7 @@ async function initHrZoneDisplay() {
                     zoneDefinitions: data.zone_definitions || {},
                     weeklySummaries: data.weekly_summaries || []
                 };
+                currentMonthData = displayData;
                 renderMonthlySummary(monthKey, displayData);
                 renderWeeklySummaries(displayData);
             } else {

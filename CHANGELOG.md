@@ -4,7 +4,7 @@ All notable changes to this project will be documented in this file. The documen
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 
-## [Unreleased] - YYYY-MM-DD
+## [0.4.0] - 2025-06-22
 
 ### Public
 
@@ -15,12 +15,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Added button routing to HR Zones config on the home screen
 - Added info panel displaying the initial sync status
 - Enabled account deletion
+- Added a toggle button to switch between time and percentage views for weekly summaries
 
 #### Changed
-- Changed time in zone calculation to be based on moving time instead of elapsed time
-
-####
-- ...
+- Changed time in zone calculation to be based on moving time instead of elapsed time.
 
 
 ### Internal
@@ -28,7 +26,5 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 #### Added
 - Added support for separate development Chrome extension ID
 
-#### Changed
-- ...
 #### Fixed
 - Used `gunicorn.conf.py` to run APScheduler in a single process only
