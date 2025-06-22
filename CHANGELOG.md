@@ -4,6 +4,32 @@ All notable changes to this project will be documented in this file. The documen
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 
+## [Unreleased] - YYYY-MM-DD
+
+### Public
+
+#### Added
+- ...
+
+#### Changed
+- ...
+
+#### Fixed
+- ...
+
+
+### Internal
+
+#### Added
+- ...
+
+#### Changed
+- ...
+
+#### Fixed
+- ...
+
+
 ## [0.4.0] - 2025-06-22
 
 ### Public
