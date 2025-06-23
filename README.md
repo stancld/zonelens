@@ -139,7 +139,7 @@ This project uses Docker for easier setup and consistent development environment
 
 **User Profile Endpoints:**
 *   `GET /api/profile/`: Retrieves the authenticated user's profile information. (Requires authentication)
-*   `DELETE /api/profile/delete/`: Deletes the authenticated user's account and all associated data. (Requires authentication)
+*   `DELETE /api/profile`: Deletes the authenticated user's account and all associated data. (Requires authentication)
 
 **Data Synchronization & Webhook Endpoints:**
 *   `POST /api/strava/sync-activities/`: Triggers a synchronization of the user's recent activities from Strava. (Requires authentication)
