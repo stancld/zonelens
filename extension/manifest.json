@@ -6,7 +6,6 @@
   "permissions": [],
   "host_permissions": [
     "*://*.strava.com/*",
-    "http://127.0.0.1:8000/*",
     "https://strava-zones.com/*"
   ],
   "content_scripts": [
