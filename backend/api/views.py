@@ -1022,12 +1022,12 @@ class StravaWebhookAPIView(APIView):
 		owner_id = event_data.get("owner_id")
 		activity_id = event_data.get("object_id")
 
-		if object_type == "activity" and aspect_type == "create":
+		if object_type == "activity" and aspect_type in ("create", "update"):
 			if response := self._check_for_owner_and_activity_ids(
 				owner_id, activity_id, event_data
 			):
 				return response
-			logger.info(f"Processing 'create activity' event activity_id: {activity_id}.")
+			logger.info(f"Processing '{aspect_type} activity' event activity_id: {activity_id}.")
 			try:
 				worker = Worker(user_strava_id=owner_id)
 				worker.process_new_activity(user_strava_id=owner_id, activity_id=activity_id)
