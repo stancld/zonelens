@@ -1,5 +1,8 @@
 # ZoneLens - Enhanced Training Calendar
 
+> [!IMPORTANT]
+> **Project Decommissioned:** This project has been decommissioned as Strava has officially introduced similar heart rate zone visualization features directly into their platform. You can learn more about Strava's native implementation in their [official announcement](https://press.strava.com/articles/strava-continues-to-accelerate-innovation-with-new-features-designed-for). We recommend using Strava's built-in features for the best experience.
+
 <div align="center">
   <a href="https://strava-zones.com" target="_blank">
     <img src="extension/images/icon512.png" alt="ZoneLens Logo" width="128"/>
